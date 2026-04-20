@@ -2,18 +2,27 @@ import { useState, useEffect } from "react";
 import COLORS from "../constants/colors";
 import Input from "../components/ui/Input";
 import Btn from "../components/ui/Btn";
-import { getUserProfile, changePassword } from "../api";
+import { getUserProfile, changePassword, sendProfileUpdateOTP, verifyProfileUpdateOTP, resendProfileUpdateOTP, updateUserProfile } from "../api";
 
 export default function UserProfilePage({ user, setPage, showToast }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    email: "",
+  });
   const [passwordForm, setPasswordForm] = useState({
     current_password: "",
     new_password: "",
     confirm_password: "",
   });
+  const [updatingProfile, setUpdatingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [otpStep, setOtpStep] = useState(null);
+  const [otpCode, setOtpCode] = useState("");
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -23,10 +32,79 @@ export default function UserProfilePage({ user, setPage, showToast }) {
     try {
       const res = await getUserProfile();
       setProfile(res.data);
+      setProfileForm({ name: res.data.name, email: res.data.email });
       setLoading(false);
     } catch (err) {
       showToast("Failed to load profile", "error");
       setLoading(false);
+    }
+  };
+
+  const handleProfileChange = (key) => (e) => {
+    setProfileForm({ ...profileForm, [key]: e.target.value });
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!profileForm.name || !profileForm.email) {
+      showToast("Please fill all fields", "error");
+      return;
+    }
+
+    if (!profileForm.email.includes("@")) {
+      showToast("Please enter a valid email", "error");
+      return;
+    }
+
+    setUpdatingProfile(true);
+    try {
+      // Step 1: Send OTP to email
+      await sendProfileUpdateOTP(profileForm.email);
+      setOtpStep("verify");
+      setOtpCode("");
+      showToast("✅ OTP sent to your email", "success");
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || err.response?.data?.msg || "Failed to send OTP";
+      showToast(`❌ ${errorMsg}`, "error");
+    } finally {
+      setUpdatingProfile(false);
+    }
+  };
+
+  const handleVerifyAndUpdateProfile = async () => {
+    if (!otpCode) {
+      showToast("Please enter OTP code", "error");
+      return;
+    }
+
+    setVerifyingOtp(true);
+    try {
+      // Step 2: Verify OTP
+      await verifyProfileUpdateOTP(profileForm.email, otpCode);
+      
+      // Step 3: Update profile
+      await updateUserProfile(profileForm.name, profileForm.email);
+      setProfile({ ...profile, name: profileForm.name, email: profileForm.email });
+      showToast("✅ Profile updated successfully!", "success");
+      
+      // Reset states
+      setIsEditingProfile(false);
+      setOtpStep(null);
+      setOtpCode("");
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || err.response?.data?.msg || "Failed to verify OTP";
+      showToast(`❌ ${errorMsg}`, "error");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    try {
+      await resendProfileUpdateOTP(profileForm.email);
+      showToast("✅ OTP resent successfully", "success");
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || err.response?.data?.msg || "Failed to resend OTP";
+      showToast(`❌ ${errorMsg}`, "error");
     }
   };
 
@@ -124,51 +202,150 @@ export default function UserProfilePage({ user, setPage, showToast }) {
             marginBottom: 24,
           }}
         >
-          <h2 style={{ color: COLORS.white, marginTop: 0, marginBottom: 20 }}>Account Information</h2>
-
-          {/* Name */}
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", color: COLORS.gray, fontSize: 12, marginBottom: 6 }}>
-              Full Name
-            </label>
-            <div
-              style={{
-                padding: "12px 14px",
-                background: COLORS.navy,
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 8,
-                color: COLORS.white,
-                fontSize: 14,
-              }}
-            >
-              {profile?.name}
-            </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <h2 style={{ color: COLORS.white, marginTop: 0, marginBottom: 0 }}>Account Information</h2>
+            {!isEditingProfile && (
+              <Btn onClick={() => setIsEditingProfile(true)} variant="secondary" style={{ fontSize: 12, padding: "8px 12px" }}>
+                ✏️ Edit
+              </Btn>
+            )}
           </div>
 
-          {/* Email */}
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", color: COLORS.gray, fontSize: 12, marginBottom: 6 }}>
-              Email Address
-            </label>
-            <div
-              style={{
-                padding: "12px 14px",
-                background: COLORS.navy,
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 8,
-                color: COLORS.white,
-                fontSize: 14,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span>{profile?.email}</span>
-              <span style={{ color: "#10b981", fontSize: 12, fontWeight: 600 }}>✓ Verified</span>
-            </div>
-          </div>
+          {!isEditingProfile ? (
+            <>
+              {/* Name - Display Mode */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", color: COLORS.gray, fontSize: 12, marginBottom: 6 }}>
+                  Full Name
+                </label>
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    background: COLORS.navy,
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 8,
+                    color: COLORS.white,
+                    fontSize: 14,
+                  }}
+                >
+                  {profile?.name}
+                </div>
+              </div>
 
-          {/* Role */}
+              {/* Email - Display Mode */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", color: COLORS.gray, fontSize: 12, marginBottom: 6 }}>
+                  Email Address
+                </label>
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    background: COLORS.navy,
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 8,
+                    color: COLORS.white,
+                    fontSize: 14,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span>{profile?.email}</span>
+                  <span style={{ color: "#10b981", fontSize: 12, fontWeight: 600 }}>✓ Verified</span>
+                </div>
+              </div>
+            </>
+          ) : otpStep === "verify" ? (
+            <>
+              {/* OTP Verification */}
+              <div style={{ 
+                background: "rgba(37, 99, 235, 0.1)",
+                border: "1px solid rgba(37, 99, 235, 0.3)",
+                borderRadius: 12,
+                padding: 20,
+                marginBottom: 20
+              }}>
+                <h3 style={{ color: COLORS.white, marginTop: 0, marginBottom: 12 }}>🔐 Verify Your Email</h3>
+                <p style={{ color: COLORS.gray, marginBottom: 16, fontSize: 14 }}>
+                  We've sent a 6-digit OTP to <strong>{profileForm.email}</strong>
+                </p>
+                
+                <Input
+                  label="Enter OTP Code"
+                  type="text"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  icon="🔐"
+                />
+
+                <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+                  <Btn onClick={handleVerifyAndUpdateProfile} disabled={verifyingOtp || !otpCode} style={{ flex: 1 }}>
+                    {verifyingOtp ? "Verifying..." : "✅ Verify & Update"}
+                  </Btn>
+                  <Btn
+                    onClick={() => {
+                      setOtpStep(null);
+                      setOtpCode("");
+                      setProfileForm({ name: profile?.name, email: profile?.email });
+                    }}
+                    variant="secondary"
+                    style={{ flex: 1 }}
+                  >
+                    Cancel
+                  </Btn>
+                </div>
+
+                <div style={{ textAlign: "center", marginTop: 12 }}>
+                  <Btn onClick={handleResendOTP} variant="secondary" style={{ fontSize: 12, padding: "6px 12px" }}>
+                    Didn't receive OTP? Resend
+                  </Btn>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Name - Edit Mode */}
+              <Input
+                label="Full Name"
+                type="text"
+                value={profileForm.name}
+                onChange={handleProfileChange("name")}
+                placeholder="Enter your full name"
+                icon="👤"
+              />
+
+              {/* Email - Edit Mode */}
+              <Input
+                label="Email Address"
+                type="email"
+                value={profileForm.email}
+                onChange={handleProfileChange("email")}
+                placeholder="Enter your email"
+                icon="📧"
+              />
+
+              {/* Edit Action Buttons */}
+              <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+                <Btn onClick={handleUpdateProfile} disabled={updatingProfile} style={{ flex: 1 }}>
+                  {updatingProfile ? "Sending OTP..." : "📧 Send OTP"}
+                </Btn>
+                <Btn
+                  onClick={() => {
+                    setIsEditingProfile(false);
+                    setProfileForm({ name: profile?.name, email: profile?.email });
+                    setOtpStep(null);
+                  }}
+                  variant="secondary"
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </Btn>
+              </div>
+            </>
+          )}
+
+          {/* Role - Always visible */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: "block", color: COLORS.gray, fontSize: 12, marginBottom: 6 }}>
               Account Role

@@ -8,6 +8,7 @@ load_dotenv()
 
 otp_store = {}  # Format: {email: {"otp": "123456", "timestamp": time.time(), "last_resend": time.time()}}
 password_reset_otp = {}  # Separate store for password reset OTP
+profile_update_otp = {}  # Separate store for profile update OTP
 OTP_EXPIRY_TIME = 10 * 60  # 10 minutes in seconds
 RESEND_COOLDOWN = 60  # 60 seconds between resends
 
@@ -215,3 +216,97 @@ def use_password_reset_otp(email, otp):
         return True, "Password reset successful"
     
     return False, "Invalid OTP. Please try again."
+
+# Profile Update OTP Functions
+async def send_profile_update_email(email: str, otp: str):
+    message = MessageSchema(
+        subject="Verify Your Profile Changes - Secure Voting",
+        recipients=[email],
+        body=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; background-color: white; padding: 30px; border-radius: 10px; margin: 0 auto;">
+                    <h2 style="color: #333;">Verify Your Profile Update</h2>
+                    <p style="color: #666; font-size: 16px;">We detected a change to your profile information. Use this OTP to confirm:</p>
+                    <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; text-align: center; margin: 20px 0;">
+                        <h1 style="color: #2563eb; letter-spacing: 5px; margin: 0;">{otp}</h1>
+                    </div>
+                    <p style="color: #999; font-size: 14px;">This OTP is valid for 10 minutes. Do not share it with anyone.</p>
+                    <p style="color: #999; font-size: 12px;">If you didn't request this change, please ignore this email.</p>
+                </div>
+            </body>
+        </html>
+        """,
+        subtype="html",
+    )
+    
+    conf = get_mail_config()
+    fm = FastMail(conf)
+    await fm.send_message(message)
+
+def generate_profile_update_otp(email):
+    otp = str(random.randint(100000, 999999))
+    profile_update_otp[email] = {
+        "otp": otp,
+        "timestamp": time.time(),
+        "last_resend": time.time()
+    }
+    return otp
+
+def can_resend_profile_update_otp(email):
+    """Check if user can resend profile update OTP (respects cooldown)"""
+    if email not in profile_update_otp:
+        return True, 0
+    
+    last_resend = profile_update_otp[email].get("last_resend", 0)
+    time_since_last = time.time() - last_resend
+    
+    if time_since_last < RESEND_COOLDOWN:
+        remaining = RESEND_COOLDOWN - time_since_last
+        return False, int(remaining)
+    
+    return True, 0
+
+def resend_profile_update_otp(email):
+    """Resend profile update OTP with cooldown check"""
+    can_send, remaining = can_resend_profile_update_otp(email)
+    
+    if not can_send:
+        return False, f"Please wait {remaining} seconds before requesting another OTP", {"remaining": remaining}
+    
+    if email not in profile_update_otp:
+        return False, "No pending profile update request found. Please try again.", {}
+    
+    otp = str(random.randint(100000, 999999))
+    profile_update_otp[email] = {
+        "otp": otp,
+        "timestamp": time.time(),
+        "last_resend": time.time()
+    }
+    return True, "Profile update OTP resent successfully", {"otp": otp}
+
+def verify_profile_update_otp(email, otp):
+    """Verify OTP for profile update (do NOT delete yet)"""
+    if email not in profile_update_otp:
+        return False, "No profile update request found"
+    
+    stored_data = profile_update_otp[email]
+    stored_otp = stored_data["otp"]
+    timestamp = stored_data["timestamp"]
+    
+    # Check if OTP expired
+    if time.time() - timestamp > OTP_EXPIRY_TIME:
+        del profile_update_otp[email]
+        return False, "OTP has expired. Please request a new one."
+    
+    # Check if OTP matches (do NOT delete yet)
+    if stored_otp == otp:
+        return True, "OTP verified successfully"
+    
+    return False, "Invalid OTP. Please try again."
+
+def use_profile_update_otp(email):
+    """Consume the OTP after verification"""
+    if email in profile_update_otp:
+        del profile_update_otp[email]
+    return True

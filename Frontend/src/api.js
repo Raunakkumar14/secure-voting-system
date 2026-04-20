@@ -53,5 +53,8 @@ export const getElectionResults = (electionId) => API.get(`/admin/elections/${el
 
 // User Profile Management
 export const getUserProfile = () => API.get("/profile");
-export const updateUserProfile = (name, email) => API.put("/profile", null, { params: { name, email } });
+export const sendProfileUpdateOTP = (email) => API.post("/profile/update-otp", { email });
+export const verifyProfileUpdateOTP = (email, otp) => API.post("/profile/verify-update-otp", { email, otp });
+export const resendProfileUpdateOTP = (email) => API.post("/profile/resend-update-otp", { email });
+export const updateUserProfile = (name, email) => API.put("/profile", { name, email });
 export const changePassword = (data) => API.post("/change-password", data);

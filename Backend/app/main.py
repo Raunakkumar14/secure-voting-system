@@ -9,7 +9,9 @@ from .jwt_utils import create_access_token, get_user_from_token
 from .otp import (
     generate_otp, verify_otp, send_otp_email, resend_otp,
     generate_password_reset_otp, verify_password_reset_otp, use_password_reset_otp, 
-    send_password_reset_email, resend_password_reset_otp
+    send_password_reset_email, resend_password_reset_otp,
+    generate_profile_update_otp, verify_profile_update_otp, use_profile_update_otp,
+    send_profile_update_email, resend_profile_update_otp
 )
 
 Base.metadata.create_all(bind=engine)
@@ -203,21 +205,7 @@ def candidates(db: Session = Depends(get_db)):
     return crud.get_candidates(db)
 
 @app.post("/vote")
-def vote(vote: schemas.VoteCreate, db: Session = Depends(get_db), authorization: str = None):
-    if not authorization:
-        raise HTTPException(401, "Not authenticated")
-    
-    try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            raise HTTPException(401, "Invalid authentication scheme")
-    except ValueError:
-        raise HTTPException(401, "Invalid authorization header")
-    
-    current_user = get_user_from_token(token)
-    if not current_user:
-        raise HTTPException(401, "Invalid or expired token")
-    
+def vote(vote: schemas.VoteCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     result = crud.create_vote(db, current_user["id"], vote.candidate_id)
 
     if result is None:
@@ -338,10 +326,51 @@ def get_profile(user: dict = Depends(get_current_user), db: Session = Depends(ge
         raise HTTPException(404, "User not found")
     return profile
 
+@app.post("/profile/update-otp")
+async def send_profile_update_otp(request: schemas.OTPRequest, user: dict = Depends(get_current_user)):
+    """Send OTP for profile update verification"""
+    otp = generate_profile_update_otp(request.email)
+    try:
+        await send_profile_update_email(request.email, otp)
+        return {"msg": "OTP sent to your email"}
+    except Exception as e:
+        print(f"Email Error: {str(e)}")
+        raise HTTPException(500, f"Failed to send OTP: {str(e)}")
+
+@app.post("/profile/verify-update-otp")
+def verify_update_otp(request: schemas.ProfileUpdateOTPRequest):
+    """Verify OTP for profile update"""
+    success, message = verify_profile_update_otp(request.email, request.otp)
+    if not success:
+        raise HTTPException(400, message)
+    return {"msg": message}
+
+@app.post("/profile/resend-update-otp")
+async def resend_update_otp(request: schemas.OTPRequest):
+    """Resend OTP for profile update"""
+    success, message, data = resend_profile_update_otp(request.email)
+    
+    if not success:
+        if "remaining" in data:
+            raise HTTPException(429, f"Rate limited. Wait {data['remaining']} seconds")
+        raise HTTPException(400, message)
+    
+    try:
+        await send_profile_update_email(request.email, data["otp"])
+        return {"msg": message}
+    except Exception as e:
+        print(f"Email Error: {str(e)}")
+        raise HTTPException(500, f"Failed to resend OTP: {str(e)}")
+
 @app.put("/profile")
-def update_profile(name: str = None, email: str = None, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Update user profile (name and email)"""
-    updated_user = crud.update_user_profile(db, user["id"], name, email)
+def update_profile(request: schemas.ProfileUpdateRequest, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Update user profile after OTP verification"""
+    success, message = verify_profile_update_otp(request.email, "")
+    
+    # Clean up OTP
+    use_profile_update_otp(request.email)
+    
+    updated_user = crud.update_user_profile(db, user["id"], request.name, request.email)
     if not updated_user:
         raise HTTPException(404, "User not found")
     return {

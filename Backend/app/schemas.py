@@ -72,3 +72,11 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
     confirm_password: str
+
+class ProfileUpdateRequest(BaseModel):
+    name: str
+    email: str
+
+class ProfileUpdateOTPRequest(BaseModel):
+    email: str
+    otp: str
