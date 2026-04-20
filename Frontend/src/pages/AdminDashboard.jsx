@@ -76,6 +76,52 @@ export default function AdminDashboard({ setPage, showToast }) {
           ))}
         </div>
 
+        {/* 🎮 Admin Controls */}
+        <div style={{
+          marginTop: 30,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: 16,
+        }}>
+          <div style={{
+            background: COLORS.navyMid,
+            padding: 24,
+            borderRadius: 16,
+            border: "1px solid rgba(255,255,255,0.08)",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🏆</div>
+            <h3 style={{ color: COLORS.white, marginTop: 0, marginBottom: 12 }}>
+              Manage Candidates
+            </h3>
+            <Btn
+              onClick={() => setPage("candidates")}
+              style={{ width: "100%" }}
+            >
+              Go to Candidates
+            </Btn>
+          </div>
+
+          <div style={{
+            background: COLORS.navyMid,
+            padding: 24,
+            borderRadius: 16,
+            border: "1px solid rgba(255,255,255,0.08)",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🗳️</div>
+            <h3 style={{ color: COLORS.white, marginTop: 0, marginBottom: 12 }}>
+              Manage Elections
+            </h3>
+            <Btn
+              onClick={() => setPage("elections")}
+              style={{ width: "100%" }}
+            >
+              Go to Elections
+            </Btn>
+          </div>
+        </div>
+
         {/* 📊 Chart */}
         <div style={{
           marginTop: 30,

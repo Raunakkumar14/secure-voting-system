@@ -26,16 +26,13 @@ export default function VoterDashboard({ user, setPage, showToast }) {
 
   const confirmVote = async () => {
     try {
-      await castVote({
-        user_id: user.id,
-        candidate_id: selected,
-      });
+      await castVote(selected);
 
       showToast("✅ Vote recorded successfully!", "success");
       setHasVoted(true);
       setConfirmModal(false);
     } catch (err) {
-      showToast("❌ You have already voted", "error");
+      showToast("❌ You have already voted or voting failed", "error");
       setHasVoted(true);
     }
   };

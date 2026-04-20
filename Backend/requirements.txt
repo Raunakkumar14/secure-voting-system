@@ -4,6 +4,6 @@ sqlalchemy
 psycopg2-binary
 python-dotenv
 passlib[bcrypt]
-python-jose
+python-jose[cryptography]
 fastapi-mail
 pydantic

@@ -19,6 +19,22 @@ export default function Navbar({ setPage, user, onLogout }) {
         <ChainBlock active />
         {user ? (
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              onClick={() => setPage("profile")}
+              style={{
+                padding: "7px 14px",
+                borderRadius: 8,
+                border: "1px solid rgba(59,130,246,0.4)",
+                background: "rgba(59,130,246,0.1)",
+                color: COLORS.blueLight,
+                fontSize: 12,
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+              title="View Profile"
+            >
+              👤 Profile
+            </button>
             <span style={{ fontSize: 13, color: COLORS.gray }}>
               {user.role === "admin" ? "👑" : "🗳️"} {user.name}
             </span>

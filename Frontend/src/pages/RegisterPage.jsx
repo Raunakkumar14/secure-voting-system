@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import COLORS from "../constants/colors";
 import Input from "../components/ui/Input";
 import Btn from "../components/ui/Btn";
-import { checkEmail, registerUser, sendOtp, verifyOtp } from "../api";
+import { checkEmail, registerUser, sendOtp, verifyOtp, resendOtp } from "../api";
 
-export default function RegisterPage({ setPage, showToast }) {
+export default function RegisterPage({ setPage, showToast, onLogin }) {
   const [step, setStep] = useState("form"); // form, otp, verifying
   const [form, setForm] = useState({
     name: "",
@@ -14,6 +14,14 @@ export default function RegisterPage({ setPage, showToast }) {
   });
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // OTP Cooldown Timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const upd = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -26,18 +34,38 @@ export default function RegisterPage({ setPage, showToast }) {
 
     setLoading(true);
     try {
-      // First check if email exists
       await checkEmail(form.email);
-      // If email is available, send OTP
       await sendOtp(form.email);
-      showToast("OTP sent to your email", "success");
+      showToast("✅ OTP sent to your email", "success");
       setStep("otp");
+      setResendCooldown(60);
     } catch (err) {
-      if (err.response?.data?.detail?.includes("already registered")) {
-        showToast("Email already registered. Please login or use a different email.", "error");
+      const errorMsg = err.response?.data?.detail;
+      if (errorMsg?.includes("already registered")) {
+        showToast("❌ Email already registered. Please login or use a different email.", "error");
       } else {
-        showToast("Failed to send OTP. Please try again.", "error");
+        showToast("❌ Failed to send OTP. Please try again.", "error");
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) {
+      showToast(`⏳ Please wait ${resendCooldown}s before resending`, "info");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await resendOtp(form.email);
+      showToast("✅ OTP resent to your email", "success");
+      setOtp(""); // Clear previous OTP input
+      setResendCooldown(60);
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail;
+      showToast(`❌ ${errorMsg || "Failed to resend OTP"}`, "error");
     } finally {
       setLoading(false);
     }
@@ -52,16 +80,20 @@ export default function RegisterPage({ setPage, showToast }) {
     setLoading(true);
     try {
       await verifyOtp(form.email, otp);
-      await registerUser({
+      const res = await registerUser({
         name: form.name,
         email: form.email,
         password: form.password,
       });
 
-      showToast("Registration successful! Please login.", "success");
-      setTimeout(() => setPage("login"), 1500);
+      const { access_token, user } = res.data;
+      onLogin(access_token, user);
+      
+      showToast("✅ Registration successful!", "success");
+      setTimeout(() => setPage("voterDash"), 1500);
     } catch (err) {
-      showToast("Invalid OTP or registration failed", "error");
+      const errorMsg = err.response?.data?.detail;
+      showToast(`❌ ${errorMsg || "Invalid OTP or registration failed"}`, "error");
     } finally {
       setLoading(false);
     }
@@ -220,10 +252,35 @@ export default function RegisterPage({ setPage, showToast }) {
                 {loading ? "Verifying..." : "Verify & Register"}
               </Btn>
 
+              {/* Resend OTP Button with Cooldown */}
+              <button
+                onClick={handleResendOtp}
+                disabled={resendCooldown > 0 || loading}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: 10,
+                  border: `1px solid ${resendCooldown > 0 ? "rgba(255,255,255,0.1)" : "rgba(16,185,129,0.3)"}`,
+                  background: resendCooldown > 0 ? "rgba(255,255,255,0.05)" : "rgba(16,185,129,0.1)",
+                  color: resendCooldown > 0 ? COLORS.gray : "#10b981",
+                  cursor: resendCooldown > 0 ? "not-allowed" : "pointer",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 12,
+                  transition: "all 0.3s ease",
+                }}
+              >
+                {resendCooldown > 0 
+                  ? `🕐 Resend OTP in ${resendCooldown}s`
+                  : "🔄 Resend OTP"
+                }
+              </button>
+
               <button
                 onClick={() => {
                   setStep("form");
                   setOtp("");
+                  setResendCooldown(0);
                 }}
                 style={{
                   width: "100%",

@@ -67,8 +67,8 @@ export default function LandingPage({ setPage }) {
 
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <Btn onClick={() => setPage("register")} style={{ fontSize: 16, padding: "14px 36px" }}>🗳️ Register as Voter</Btn>
-            <Btn onClick={() => setPage("login")} variant="secondary" style={{ fontSize: 16, padding: "14px 36px" }}>Login to Vote</Btn>
-            <Btn onClick={() => setPage("login")} variant="secondary" style={{ fontSize: 16, padding: "14px 36px" }}>👑 Admin Login</Btn>
+            <Btn onClick={() => setPage("login")} variant="secondary" style={{ fontSize: 16, padding: "14px 36px" }}>🗳️ User Login</Btn>
+            <Btn onClick={() => setPage("adminLogin")} variant="secondary" style={{ fontSize: 16, padding: "14px 36px" }}>👑 Admin Login</Btn>
           </div>
 
           {/* Stats */}

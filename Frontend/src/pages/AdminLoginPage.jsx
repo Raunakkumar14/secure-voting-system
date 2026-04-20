@@ -4,7 +4,7 @@ import Input from "../components/ui/Input";
 import Btn from "../components/ui/Btn";
 import { loginUser } from "../api";
 
-export default function LoginPage({ setPage, onLogin, showToast }) {
+export default function AdminLoginPage({ setPage, onLogin, showToast }) {
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -27,14 +27,19 @@ export default function LoginPage({ setPage, onLogin, showToast }) {
 
       const { access_token, user } = res.data;
       
+      // ✅ IMPORTANT: Check if user is actually an admin
+      if (user.role !== "admin") {
+        showToast(`❌ Error: Your account is a ${user.role}. You are not authorized to access the admin dashboard.`, "error");
+        return;
+      }
+
       onLogin(access_token, user);
 
-      const roleMessage = user.role === "admin" ? "👑 Admin Dashboard" : "🗳️ Voter Dashboard";
-      showToast(`Welcome back, ${user.name}! Accessing ${roleMessage}`, "success");
+      showToast(`Welcome back, Admin ${user.name}! 👑`, "success");
 
-      setPage(user.role === "admin" ? "admin" : "voterDash");
+      setPage("admin");
     } catch (err) {
-      showToast("Invalid email or password", "error");
+      showToast("Invalid admin credentials", "error");
     }
   };
 
@@ -51,7 +56,7 @@ export default function LoginPage({ setPage, onLogin, showToast }) {
     >
       <div style={{ width: "100%", maxWidth: 440 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
+          <div style={{ fontSize: 50, marginBottom: 12 }}>👑</div>
           <h2
             style={{
               fontFamily: "'Rajdhani', sans-serif",
@@ -61,13 +66,13 @@ export default function LoginPage({ setPage, onLogin, showToast }) {
               margin: 0,
             }}
           >
-            Welcome Back
+            Admin Access
           </h2>
           <p style={{ color: COLORS.gray, fontSize: 14, marginTop: 6 }}>
-            Access your secure voting portal
+            Restricted to administrators only
           </p>
-          <p style={{ color: COLORS.blueLight, fontSize: 12, marginTop: 8, padding: 8, background: "rgba(59,130,246,0.1)", borderRadius: 6 }}>
-            ℹ️ Your dashboard role is determined by your account type. Admins have admin credentials.
+          <p style={{ color: "#ef4444", fontSize: 12, marginTop: 8, padding: 8, background: "rgba(239,68,68,0.1)", borderRadius: 6 }}>
+            ⚠️ Only admin accounts can access this dashboard. Regular user accounts will be rejected.
           </p>
         </div>
 
@@ -80,16 +85,16 @@ export default function LoginPage({ setPage, onLogin, showToast }) {
           }}
         >
           <Input
-            label="Email / Username"
+            label="Admin Email"
             type="email"
             value={form.email}
             onChange={upd("email")}
-            placeholder="Enter your email"
+            placeholder="Enter admin email"
             icon="✉️"
           />
 
           <Input
-            label="Password"
+            label="Admin Password"
             type="password"
             value={form.password}
             onChange={upd("password")}
@@ -101,7 +106,7 @@ export default function LoginPage({ setPage, onLogin, showToast }) {
             onClick={handleLogin}
             style={{ width: "100%", marginTop: 4 }}
           >
-            🔐 Login
+            👑 Admin Login
           </Btn>
 
           <div
@@ -113,7 +118,7 @@ export default function LoginPage({ setPage, onLogin, showToast }) {
             }}
           >
             <button
-              onClick={() => setPage("register")}
+              onClick={() => setPage("login")}
               style={{
                 background: "none",
                 border: "none",
@@ -123,20 +128,7 @@ export default function LoginPage({ setPage, onLogin, showToast }) {
                 fontWeight: 600,
               }}
             >
-              Create account
-            </button>
-            <button
-              onClick={() => setPage("forgotPassword")}
-              style={{
-                background: "none",
-                border: "none",
-                color: COLORS.blueLight,
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              Forgot password?
+              🗳️ User Login
             </button>
             <button
               onClick={() => setPage("landing")}
@@ -151,6 +143,22 @@ export default function LoginPage({ setPage, onLogin, showToast }) {
               ← Back to Home
             </button>
           </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 24,
+            padding: 16,
+            background: "rgba(59,130,246,0.1)",
+            border: "1px solid rgba(59,130,246,0.3)",
+            borderRadius: 12,
+            color: COLORS.blueLight,
+            fontSize: 12,
+            lineHeight: 1.6,
+          }}
+        >
+          <strong>ℹ️ Admin Portal</strong><br/>
+          This is a secure admin-only portal. If you are a regular user, please use the <strong>User Login</strong> option instead.
         </div>
       </div>
     </div>
