@@ -40,47 +40,57 @@ export default function LoginPage({ setPage, onLogin, showToast }) {
 
   return (
     <div
+      className="fade-in"
       style={{
         minHeight: "100vh",
-        background: COLORS.navy,
+        background: `radial-gradient(circle at 50% 0%, rgba(26, 86, 219, 0.1), transparent), ${COLORS.navy}`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "80px 24px 40px",
+        padding: "40px 24px",
+        fontFamily: "'Inter', sans-serif"
       }}
     >
       <div style={{ width: "100%", maxWidth: 440 }}>
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <div style={{ 
+            width: 80, height: 80, background: "rgba(255,255,255,0.03)", 
+            borderRadius: 24, display: "flex", alignItems: "center", 
+            justifyContent: "center", fontSize: 40, margin: "0 auto 24px",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.2)"
+          }}>
+            🔐
+          </div>
           <h2
             style={{
-              fontFamily: "'Rajdhani', sans-serif",
-              fontSize: 36,
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 32,
               fontWeight: 800,
               color: COLORS.white,
               margin: 0,
+              letterSpacing: "-0.02em"
             }}
           >
             Welcome Back
           </h2>
-          <p style={{ color: COLORS.gray, fontSize: 14, marginTop: 6 }}>
+          <p style={{ color: COLORS.gray, fontSize: 16, marginTop: 10, fontWeight: 400 }}>
             Access your secure voting portal
-          </p>
-          <p style={{ color: COLORS.blueLight, fontSize: 12, marginTop: 8, padding: 8, background: "rgba(59,130,246,0.1)", borderRadius: 6 }}>
-            ℹ️ Your dashboard role is determined by your account type. Admins have admin credentials.
           </p>
         </div>
 
         <div
           style={{
-            background: COLORS.navyMid,
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 20,
-            padding: 36,
+            background: "rgba(255, 255, 255, 0.02)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: 28,
+            padding: "40px",
+            backdropFilter: "blur(20px)",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
           }}
         >
           <Input
-            label="Email / Username"
+            label="Email Address"
             type="email"
             value={form.email}
             onChange={upd("email")}
@@ -99,54 +109,63 @@ export default function LoginPage({ setPage, onLogin, showToast }) {
 
           <Btn
             onClick={handleLogin}
-            style={{ width: "100%", marginTop: 4 }}
+            style={{ width: "100%", marginTop: 10, padding: "14px" }}
           >
-            🔐 Login
+            Login to Dashboard
           </Btn>
 
           <div
             style={{
               display: "flex",
-              justifyContent: "space-between",
-              marginTop: 16,
+              flexDirection: "column",
+              gap: 12,
+              marginTop: 24,
               alignItems: "center",
             }}
           >
-            <button
-              onClick={() => setPage("register")}
-              style={{
-                background: "none",
-                border: "none",
-                color: COLORS.blueLight,
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              Create account
-            </button>
-            <button
-              onClick={() => setPage("forgotPassword")}
-              style={{
-                background: "none",
-                border: "none",
-                color: COLORS.blueLight,
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              Forgot password?
-            </button>
+            <div style={{ display: "flex", gap: 16 }}>
+              <button
+                onClick={() => setPage("register")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: COLORS.blueLight,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: "'Outfit', sans-serif"
+                }}
+              >
+                Create account
+              </button>
+              <button
+                onClick={() => setPage("forgotPassword")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: COLORS.blueLight,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: "'Outfit', sans-serif"
+                }}
+              >
+                Forgot password?
+              </button>
+            </div>
             <button
               onClick={() => setPage("landing")}
               style={{
                 background: "none",
                 border: "none",
-                color: COLORS.gray,
+                color: "rgba(255,255,255,0.4)",
                 cursor: "pointer",
                 fontSize: 13,
+                marginTop: 8,
+                transition: "color 0.2s"
               }}
+              onMouseEnter={(e) => e.target.style.color = COLORS.white}
+              onMouseLeave={(e) => e.target.style.color = "rgba(255,255,255,0.4)"}
             >
               ← Back to Home
             </button>

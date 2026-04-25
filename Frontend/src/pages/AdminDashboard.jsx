@@ -13,130 +13,152 @@ export default function AdminDashboard({ setPage, showToast }) {
   });
 
   useEffect(() => {
-    // 📊 Vote results
     getResults()
       .then((res) => setResults(res.data))
       .catch(() => showToast("Failed to load results", "error"));
 
-    // 📈 Stats
     getStats()
       .then((res) => setStats(res.data))
       .catch(() => showToast("Failed to load stats", "error"));
   }, []);
 
   return (
-    <div style={{
+    <div className="fade-in" style={{
       minHeight: "100vh",
-      background: COLORS.navy,
-      padding: "84px 24px 40px",
-      fontFamily: "'IBM Plex Sans', sans-serif",
+      background: `radial-gradient(circle at 100% 0%, rgba(26, 86, 219, 0.1), transparent), ${COLORS.navy}`,
+      padding: "100px 24px 60px",
+      fontFamily: "'Inter', sans-serif",
     }}>
-      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
 
-        <h1 style={{
-          fontFamily: "'Rajdhani', sans-serif",
-          fontSize: 40,
-          fontWeight: 900,
-          color: COLORS.white,
-        }}>
-          📊 Admin Dashboard
-        </h1>
+        <div style={{ marginBottom: 40 }}>
+          <h1 style={{
+            fontFamily: "'Outfit', sans-serif",
+            fontSize: "clamp(32px, 5vw, 42px)",
+            fontWeight: 800,
+            color: COLORS.white,
+            margin: 0,
+            letterSpacing: "-0.02em"
+          }}>
+            Admin Oversight ⚖️
+          </h1>
+          <p style={{ color: COLORS.gray, fontSize: 16, marginTop: 8 }}>
+            System-wide statistics and management portal.
+          </p>
+        </div>
 
-        {/* 🔥 Stats Cards */}
+        {/* Stats Cards */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 16,
-          marginTop: 24,
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: 24,
         }}>
           {[
-            { label: "Total Users", value: stats.total_users, icon: "👤" },
-            { label: "Total Votes", value: stats.total_votes, icon: "🗳️" },
-            { label: "Candidates", value: stats.total_candidates, icon: "🏆" },
+            { label: "Registered Voters", value: stats.total_users, icon: "👤", color: COLORS.blue },
+            { label: "Total Votes Cast", value: stats.total_votes, icon: "🗳️", color: COLORS.cyan },
+            { label: "Active Candidates", value: stats.total_candidates, icon: "🏆", color: COLORS.gold },
           ].map((card, i) => (
             <div key={i} style={{
-              background: COLORS.navyMid,
-              padding: 20,
-              borderRadius: 16,
+              background: "rgba(255, 255, 255, 0.02)",
+              padding: "32px",
+              borderRadius: 24,
               border: "1px solid rgba(255,255,255,0.08)",
+              display: "flex",
+              alignItems: "center",
+              gap: 20
             }}>
-              <div style={{ fontSize: 24 }}>{card.icon}</div>
-              <div style={{ color: COLORS.gray, fontSize: 12, marginTop: 6 }}>
-                {card.label}
-              </div>
-              <div style={{
-                color: COLORS.white,
-                fontSize: 26,
-                fontWeight: 700,
-                marginTop: 4,
+              <div style={{ 
+                width: 60, height: 60, borderRadius: 16, background: "rgba(255,255,255,0.04)",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28,
+                border: "1px solid rgba(255,255,255,0.08)"
               }}>
-                {card.value}
+                {card.icon}
+              </div>
+              <div>
+                <div style={{ color: COLORS.gray, fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>
+                  {card.label}
+                </div>
+                <div style={{
+                  color: COLORS.white,
+                  fontSize: 32,
+                  fontWeight: 800,
+                  fontFamily: "'Outfit', sans-serif",
+                  marginTop: 4,
+                }}>
+                  {card.value}
+                </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* 🎮 Admin Controls */}
+        {/* Main Content Grid */}
         <div style={{
-          marginTop: 30,
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
+          gap: 24,
+          marginTop: 24
         }}>
+          {/* Chart Container */}
           <div style={{
-            background: COLORS.navyMid,
-            padding: 24,
-            borderRadius: 16,
+            background: "rgba(255, 255, 255, 0.02)",
+            padding: "32px",
+            borderRadius: 28,
             border: "1px solid rgba(255,255,255,0.08)",
-            textAlign: "center",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.3)"
           }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🏆</div>
-            <h3 style={{ color: COLORS.white, marginTop: 0, marginBottom: 12 }}>
-              Manage Candidates
+            <h3 style={{ color: COLORS.white, fontFamily: "'Outfit', sans-serif", fontSize: 22, margin: "0 0 24px" }}>
+              Live Tally Results
             </h3>
-            <Btn
-              onClick={() => setPage("candidates")}
-              style={{ width: "100%" }}
-            >
-              Go to Candidates
-            </Btn>
+            <div style={{ height: 300 }}>
+              <BarChart data={results} />
+            </div>
           </div>
 
-          <div style={{
-            background: COLORS.navyMid,
-            padding: 24,
-            borderRadius: 16,
-            border: "1px solid rgba(255,255,255,0.08)",
-            textAlign: "center",
-          }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🗳️</div>
-            <h3 style={{ color: COLORS.white, marginTop: 0, marginBottom: 12 }}>
-              Manage Elections
-            </h3>
-            <Btn
-              onClick={() => setPage("elections")}
-              style={{ width: "100%" }}
-            >
-              Go to Elections
-            </Btn>
+          {/* Quick Actions */}
+          <div style={{ display: "grid", gap: 24 }}>
+            <div style={{
+              background: "rgba(255, 255, 255, 0.02)",
+              padding: "32px",
+              borderRadius: 28,
+              border: "1px solid rgba(255,255,255,0.08)",
+              textAlign: "left",
+            }}>
+              <h3 style={{ color: COLORS.white, fontFamily: "'Outfit', sans-serif", fontSize: 20, margin: "0 0 16px" }}>
+                Candidate Mgmt
+              </h3>
+              <p style={{ color: COLORS.gray, fontSize: 14, marginBottom: 24 }}>
+                Add, update or remove participants from active elections.
+              </p>
+              <Btn onClick={() => setPage("candidates")} style={{ width: "100%" }}>
+                Open Management
+              </Btn>
+            </div>
+
+            <div style={{
+              background: "rgba(255, 255, 255, 0.02)",
+              padding: "32px",
+              borderRadius: 28,
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              textAlign: "left",
+            }}>
+              <h3 style={{ color: COLORS.white, fontFamily: "'Outfit', sans-serif", fontSize: 20, margin: "0 0 16px" }}>
+                Election Control
+              </h3>
+              <p style={{ color: COLORS.gray, fontSize: 14, marginBottom: 24 }}>
+                Schedule start/end times and manage ballot access.
+              </p>
+              <Btn onClick={() => setPage("elections")} style={{ width: "100%" }}>
+                Open Controls
+              </Btn>
+            </div>
           </div>
         </div>
 
-        {/* 📊 Chart */}
-        <div style={{
-          marginTop: 30,
-          background: COLORS.navyMid,
-          padding: 24,
-          borderRadius: 16,
-          border: "1px solid rgba(255,255,255,0.08)",
-        }}>
-          <h3 style={{ color: COLORS.white }}>Live Vote Results</h3>
-          <BarChart data={results} />
-        </div>
-
-        <div style={{ marginTop: 20 }}>
-          <Btn onClick={() => setPage("ledger")} variant="secondary">
-            View Ledger
+        {/* Global Actions */}
+        <div style={{ marginTop: 32, display: "flex", gap: 16 }}>
+          <Btn onClick={() => setPage("ledger")} variant="secondary" style={{ flex: 1 }}>
+            View Full Audit Ledger
           </Btn>
         </div>
 

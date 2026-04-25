@@ -101,44 +101,55 @@ export default function RegisterPage({ setPage, showToast, onLogin }) {
 
   return (
     <div
+      className="fade-in"
       style={{
         minHeight: "100vh",
-        background: COLORS.navy,
+        background: `radial-gradient(circle at 0% 0%, rgba(26, 86, 219, 0.1), transparent), ${COLORS.navy}`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "80px 24px 40px",
+        padding: "40px 24px",
+        fontFamily: "'Inter', sans-serif"
       }}
     >
-      <div style={{ width: "100%", maxWidth: 480 }}>
-        <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>
+      <div style={{ width: "100%", maxWidth: 500 }}>
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <div style={{ 
+            width: 80, height: 80, background: "rgba(255,255,255,0.03)", 
+            borderRadius: 24, display: "flex", alignItems: "center", 
+            justifyContent: "center", fontSize: 40, margin: "0 auto 24px",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.2)"
+          }}>
             {step === "form" ? "📝" : "🔐"}
           </div>
           <h2
             style={{
-              fontFamily: "'Rajdhani', sans-serif",
-              fontSize: 36,
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 32,
               fontWeight: 800,
               color: COLORS.white,
               margin: 0,
+              letterSpacing: "-0.02em"
             }}
           >
             {step === "form" ? "Create Account" : "Verify Email"}
           </h2>
-          <p style={{ color: COLORS.gray, fontSize: 14, marginTop: 6 }}>
+          <p style={{ color: COLORS.gray, fontSize: 16, marginTop: 10 }}>
             {step === "form"
-              ? "Register to participate in secure elections"
-              : "Enter the OTP sent to your email"}
+              ? "Join the secure digital democracy"
+              : "Enter the code sent to your email"}
           </p>
         </div>
 
         <div
           style={{
-            background: COLORS.navyMid,
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 20,
-            padding: 36,
+            background: "rgba(255, 255, 255, 0.02)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: 28,
+            padding: "40px",
+            backdropFilter: "blur(20px)",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
           }}
         >
           {step === "form" ? (
@@ -159,7 +170,7 @@ export default function RegisterPage({ setPage, showToast, onLogin }) {
                 icon="✉️"
               />
               <Input
-                label="Voter ID"
+                label="Voter ID (Optional)"
                 value={form.voterId}
                 onChange={upd("voterId")}
                 placeholder="VTR-2026-XXXXXX"
@@ -174,37 +185,23 @@ export default function RegisterPage({ setPage, showToast, onLogin }) {
                 icon="🔑"
               />
 
-              <div
-                style={{
-                  background: "rgba(245,158,11,0.08)",
-                  border: "1px solid rgba(245,158,11,0.2)",
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  marginBottom: 20,
-                  fontSize: 12,
-                  color: "#fbbf24",
-                }}
-              >
-                ⚠️ Your Voter ID must match government records for verification
-              </div>
-
               <Btn
                 onClick={handleSendOtp}
-                style={{ width: "100%" }}
+                style={{ width: "100%", marginTop: 10, padding: "14px" }}
                 disabled={loading}
               >
-                {loading ? "Sending OTP..." : "Send OTP"}
+                {loading ? "Sending..." : "Continue to Verification"}
               </Btn>
 
               <p
                 style={{
                   textAlign: "center",
-                  marginTop: 16,
+                  marginTop: 24,
                   color: COLORS.gray,
-                  fontSize: 13,
+                  fontSize: 14,
                 }}
               >
-                Already registered?{" "}
+                Already have an account?{" "}
                 <button
                   onClick={() => setPage("login")}
                   style={{
@@ -213,6 +210,7 @@ export default function RegisterPage({ setPage, showToast, onLogin }) {
                     color: COLORS.blueLight,
                     cursor: "pointer",
                     fontWeight: 600,
+                    fontFamily: "'Outfit', sans-serif"
                   }}
                 >
                   Login here
@@ -223,77 +221,73 @@ export default function RegisterPage({ setPage, showToast, onLogin }) {
             <>
               <div
                 style={{
-                  background: "rgba(59,130,246,0.08)",
-                  border: "1px solid rgba(59,130,246,0.2)",
-                  borderRadius: 10,
-                  padding: "12px 14px",
-                  marginBottom: 20,
-                  fontSize: 13,
-                  color: "#60a5fa",
+                  background: "rgba(59, 130, 246, 0.05)",
+                  border: "1px solid rgba(59, 130, 246, 0.2)",
+                  borderRadius: 12,
+                  padding: "16px",
+                  marginBottom: 24,
+                  fontSize: 14,
+                  color: "#93c5fd",
+                  textAlign: "center"
                 }}
               >
-                📧 OTP sent to <strong>{form.email}</strong>
+                We've sent a code to <strong>{form.email}</strong>
               </div>
 
               <Input
-                label="Enter OTP"
+                label="Verification Code"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
                 placeholder="000000"
-                icon="🔑"
+                icon="🔢"
                 maxLength="6"
               />
 
               <Btn
                 onClick={handleVerifyOtp}
-                style={{ width: "100%", marginBottom: 12 }}
+                style={{ width: "100%", marginBottom: 16, padding: "14px" }}
                 disabled={loading}
               >
-                {loading ? "Verifying..." : "Verify & Register"}
+                {loading ? "Verifying..." : "Verify & Complete"}
               </Btn>
 
-              {/* Resend OTP Button with Cooldown */}
               <button
                 onClick={handleResendOtp}
                 disabled={resendCooldown > 0 || loading}
                 style={{
                   width: "100%",
-                  padding: "12px",
-                  borderRadius: 10,
-                  border: `1px solid ${resendCooldown > 0 ? "rgba(255,255,255,0.1)" : "rgba(16,185,129,0.3)"}`,
-                  background: resendCooldown > 0 ? "rgba(255,255,255,0.05)" : "rgba(16,185,129,0.1)",
-                  color: resendCooldown > 0 ? COLORS.gray : "#10b981",
+                  padding: "14px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.05)",
+                  background: resendCooldown > 0 ? "transparent" : "rgba(16, 185, 129, 0.05)",
+                  color: resendCooldown > 0 ? "rgba(255,255,255,0.3)" : "#34d399",
                   cursor: resendCooldown > 0 ? "not-allowed" : "pointer",
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: 600,
-                  marginBottom: 12,
+                  marginBottom: 16,
                   transition: "all 0.3s ease",
+                  fontFamily: "'Outfit', sans-serif"
                 }}
               >
                 {resendCooldown > 0 
-                  ? `🕐 Resend OTP in ${resendCooldown}s`
-                  : "🔄 Resend OTP"
+                  ? `Resend in ${resendCooldown}s`
+                  : "Resend Code"
                 }
               </button>
 
               <button
-                onClick={() => {
-                  setStep("form");
-                  setOtp("");
-                  setResendCooldown(0);
-                }}
+                onClick={() => setStep("form")}
                 style={{
                   width: "100%",
                   padding: "12px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  background: "transparent",
-                  color: COLORS.gray,
+                  border: "none",
+                  background: "none",
+                  color: "rgba(255,255,255,0.4)",
                   cursor: "pointer",
-                  fontSize: 13,
+                  fontSize: 14,
                 }}
               >
-                ← Back to Form
+                ← Edit details
               </button>
             </>
           )}
