@@ -1,6 +1,10 @@
 from . import models
 from .auth import hash_password, verify_password
 from datetime import datetime
+from email_validator import validate_email, EmailNotValidError
+
+# Common typos for major email providers
+COMMON_TYPOS = ["gmai.com", "gmal.com", "yaho.com", "outloo.com", "hotmai.com", "gmaill.com", "gmial.com"]
 
 def create_user(db, user):
     new_user = models.User(
@@ -21,6 +25,10 @@ def login_user(db, email, password):
     if not verify_password(password, user.password):
         return None
     return user
+
+def get_all_voter_emails(db):
+    """Fetch all voter emails for notifications"""
+    return [u.email for u in db.query(models.User).filter(models.User.role == "voter").all()]
 
 
 def get_candidates(db):
@@ -72,9 +80,14 @@ def create_vote(db, user_id, candidate_id):
     if existing_vote:
         return None  # already voted
 
+    # Get candidate to find election_id
+    candidate = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
+    election_id = candidate.election_id if candidate else None
+
     new_vote = models.Vote(
         user_id=user_id,
-        candidate_id=candidate_id
+        candidate_id=candidate_id,
+        election_id=election_id
     )
 
     db.add(new_vote)
@@ -113,6 +126,20 @@ def reset_password(db, email, new_password):
 def email_exists(db, email):
     user = db.query(models.User).filter(models.User.email == email).first()
     return user is not None
+
+def is_valid_email(email: str):
+    """Helper to validate email format, deliverability, and common typos."""
+    try:
+        # 1. Check for common typos first
+        domain = email.split('@')[-1].lower() if '@' in email else ""
+        if domain in COMMON_TYPOS:
+            return False, f"Possible typo in domain: '{domain}'. Did you mean '{domain.replace('gmai.com', 'gmail.com').replace('yaho.com', 'yahoo.com')}'?"
+
+        # 2. Check deliverability (MX records)
+        email_info = validate_email(email, check_deliverability=True)
+        return True, email_info.normalized
+    except EmailNotValidError as e:
+        return False, str(e)
 
 def get_user_profile(db, user_id):
     user = db.query(models.User).filter(models.User.id == user_id).first()
@@ -203,3 +230,47 @@ def end_election(db, election_id):
     db.commit()
     db.refresh(election)
     return election
+
+# Session Management
+def create_session(db, user_id, jti, device_info, ip_address):
+    """Create a new user session record"""
+    session = models.UserSession(
+        user_id=user_id,
+        token_jti=jti,
+        device_info=device_info,
+        ip_address=ip_address
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return session
+
+def is_session_active(db, jti):
+    """Check if a specific session JTI is still active"""
+    session = db.query(models.UserSession).filter(models.UserSession.token_jti == jti).first()
+    return session is not None and session.is_active
+
+def get_user_sessions(db, user_id):
+    """Get all active sessions for a user"""
+    return db.query(models.UserSession).filter(
+        models.UserSession.user_id == user_id,
+        models.UserSession.is_active == True
+    ).order_by(models.UserSession.created_at.desc()).all()
+
+def revoke_session(db, jti):
+    """Deactivate a specific session"""
+    session = db.query(models.UserSession).filter(models.UserSession.token_jti == jti).first()
+    if session:
+        session.is_active = False
+        db.commit()
+        return True
+    return False
+
+def revoke_all_user_sessions(db, user_id, except_jti=None):
+    """Deactivate all sessions for a user, optionally keeping one active"""
+    query = db.query(models.UserSession).filter(models.UserSession.user_id == user_id)
+    if except_jti:
+        query = query.filter(models.UserSession.token_jti != except_jti)
+    
+    query.update({"is_active": False}, synchronize_session=False)
+    db.commit()

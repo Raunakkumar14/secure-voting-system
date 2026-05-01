@@ -44,7 +44,7 @@ export default function RegisterPage({ setPage, showToast, onLogin }) {
       if (errorMsg?.includes("already registered")) {
         showToast("❌ Email already registered. Please login or use a different email.", "error");
       } else {
-        showToast("❌ Failed to send OTP. Please try again.", "error");
+        showToast(`❌ ${errorMsg || "Failed to send OTP. Please try again."}`, "error");
       }
     } finally {
       setLoading(false);

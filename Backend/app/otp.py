@@ -9,8 +9,37 @@ load_dotenv()
 otp_store = {}  # Format: {email: {"otp": "123456", "timestamp": time.time(), "last_resend": time.time()}}
 password_reset_otp = {}  # Separate store for password reset OTP
 profile_update_otp = {}  # Separate store for profile update OTP
+rate_limit_store = {}  # Format: {email: [timestamp1, timestamp2, ...]}
+
 OTP_EXPIRY_TIME = 10 * 60  # 10 minutes in seconds
 RESEND_COOLDOWN = 60  # 60 seconds between resends
+RATE_LIMIT_WINDOW = 3600  # 1 hour
+MAX_OTP_PER_HOUR = 5  # Maximum OTPs allowed per hour
+
+def check_rate_limit(email: str):
+    """Check if the user has exceeded the maximum allowed OTPs per hour"""
+    now = time.time()
+    if email not in rate_limit_store:
+        rate_limit_store[email] = []
+        return True, 0
+    
+    # Filter out timestamps older than the window
+    rate_limit_store[email] = [t for t in rate_limit_store[email] if now - t < RATE_LIMIT_WINDOW]
+    
+    count = len(rate_limit_store[email])
+    if count >= MAX_OTP_PER_HOUR:
+        # Calculate time remaining until the oldest request expires
+        oldest_request = rate_limit_store[email][0]
+        remaining = int(RATE_LIMIT_WINDOW - (now - oldest_request))
+        return False, remaining
+    
+    return True, 0
+
+def track_otp_request(email: str):
+    """Log an OTP request for rate limiting"""
+    if email not in rate_limit_store:
+        rate_limit_store[email] = []
+    rate_limit_store[email].append(time.time())
 
 def get_mail_config():
     return ConnectionConfig(
@@ -310,3 +339,107 @@ def use_profile_update_otp(email):
     if email in profile_update_otp:
         del profile_update_otp[email]
     return True
+
+# Automated Notifications
+async def send_election_alert(emails: list, election_title: str):
+    """Send election start notification to all voters"""
+    if not emails:
+        return
+        
+    message = MessageSchema(
+        subject=f"URGENT: Election Started - {election_title}",
+        recipients=emails,
+        body=f"""
+        <html>
+            <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; padding: 20px;">
+                <div style="max-width: 600px; background-color: white; padding: 40px; border-radius: 16px; margin: 0 auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-top: 6px solid #2563eb;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <span style="font-size: 48px;">🗳️</span>
+                    </div>
+                    <h2 style="color: #1e293b; text-align: center; font-size: 24px; margin-bottom: 20px;">Election is Now LIVE!</h2>
+                    <p style="color: #475569; font-size: 16px; line-height: 1.6; text-align: center;">The following election has officially started and is ready for your vote:</p>
+                    
+                    <div style="background-color: #eff6ff; padding: 24px; border-radius: 12px; margin: 30px 0; border-left: 4px solid #2563eb; text-align: center;">
+                        <h3 style="color: #1e40af; margin: 0; font-size: 20px;">{election_title}</h3>
+                        <p style="color: #3b82f6; font-size: 14px; margin: 10px 0 0; font-weight: 600;">STATUS: ACTIVE</p>
+                    </div>
+                    
+                    <p style="color: #475569; line-height: 1.6; text-align: center;">Exercise your democratic right today. Your vote is secure, anonymous, and vital to the process.</p>
+                    
+                    <div style="text-align: center; margin-top: 40px; margin-bottom: 40px;">
+                        <a href="http://localhost:3000" style="background-color: #2563eb; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Cast Your Vote Now</a>
+                    </div>
+                    
+                    <div style="border-top: 1px solid #e2e8f0; padding-top: 30px; text-align: center;">
+                        <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                            This is an automated notification from the Secure Voting System.
+                        </p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """,
+        subtype="html",
+    )
+    
+    conf = get_mail_config()
+    fm = FastMail(conf)
+    await fm.send_message(message)
+
+async def send_vote_confirmation(email: str, election_title: str, candidate_name: str):
+    """Send confirmation email after successful vote"""
+    import time as time_module
+    timestamp = time_module.strftime("%Y-%m-%d %H:%M:%S", time_module.localtime())
+    
+    message = MessageSchema(
+        subject="Vote Confirmation - Secure Voting Ledger",
+        recipients=[email],
+        body=f"""
+        <html>
+            <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0fdf4; padding: 20px;">
+                <div style="max-width: 600px; background-color: white; padding: 40px; border-radius: 16px; margin: 0 auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-top: 6px solid #10b981;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <span style="font-size: 48px;">✅</span>
+                    </div>
+                    <h2 style="color: #064e3b; text-align: center; font-size: 24px; margin-bottom: 10px;">Vote Successfully Cast!</h2>
+                    <p style="color: #065f46; text-align: center; font-size: 16px; margin-bottom: 30px;">Your selection has been securely recorded in the digital ledger.</p>
+                    
+                    <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; margin: 30px 0; border: 1px solid #e2e8f0;">
+                        <table style="width: 100%; font-size: 14px; color: #334155;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b;"><strong>Election:</strong></td>
+                                <td style="padding: 8px 0; color: #1e293b;">{election_title}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b;"><strong>Candidate:</strong></td>
+                                <td style="padding: 8px 0; color: #1e293b;">{candidate_name}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #64748b;"><strong>Timestamp:</strong></td>
+                                <td style="padding: 8px 0; color: #1e293b;">{timestamp}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 12px 0 0 0;" colspan="2">
+                                    <span style="background-color: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">Verified & Recorded</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <p style="color: #475569; font-size: 14px; line-height: 1.6; text-align: center;">Thank you for participating in this election. Your contribution to digital democracy ensures a fair and transparent outcome.</p>
+                    
+                    <div style="border-top: 1px solid #e2e8f0; padding-top: 30px; margin-top: 30px; text-align: center;">
+                        <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                            This receipt is for your records. Your identity remains anonymous in the public results.
+                        </p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """,
+        subtype="html",
+    )
+    
+    conf = get_mail_config()
+    fm = FastMail(conf)
+    await fm.send_message(message)

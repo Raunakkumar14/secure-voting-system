@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 import os
 from dotenv import load_dotenv
+import uuid
 
 load_dotenv()
 
@@ -17,7 +18,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -37,8 +38,9 @@ def get_user_from_token(token: str):
     
     user_id = payload.get("sub")
     email = payload.get("email")
+    jti = payload.get("jti")
     
     if user_id is None:
         return None
     
-    return {"id": int(user_id), "email": email}
+    return {"id": int(user_id), "email": email, "jti": jti}

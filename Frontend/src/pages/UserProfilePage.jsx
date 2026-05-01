@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import COLORS from "../constants/colors";
 import Input from "../components/ui/Input";
 import Btn from "../components/ui/Btn";
-import { getUserProfile, changePassword, sendProfileUpdateOTP, verifyProfileUpdateOTP, resendProfileUpdateOTP, updateUserProfile } from "../api";
+import { getUserProfile, changePassword, sendProfileUpdateOTP, verifyProfileUpdateOTP, resendProfileUpdateOTP, updateUserProfile, listSessions, logoutAllDevices, revokeSession } from "../api";
 
 export default function UserProfilePage({ user, setPage, showToast }) {
   const [profile, setProfile] = useState(null);
@@ -23,10 +23,26 @@ export default function UserProfilePage({ user, setPage, showToast }) {
   const [otpStep, setOtpStep] = useState(null);
   const [otpCode, setOtpCode] = useState("");
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  
+  const [sessions, setSessions] = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
 
   useEffect(() => {
     fetchProfile();
+    fetchSessions();
   }, []);
+
+  const fetchSessions = async () => {
+    setLoadingSessions(true);
+    try {
+      const res = await listSessions();
+      setSessions(res.data);
+    } catch (err) {
+      console.error("Failed to load sessions");
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -144,6 +160,27 @@ export default function UserProfilePage({ user, setPage, showToast }) {
       showToast(`❌ ${errorMsg}`, "error");
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const handleRevokeSession = async (jti) => {
+    try {
+      await revokeSession(jti);
+      showToast("✅ Device logged out", "success");
+      fetchSessions();
+    } catch (err) {
+      showToast("❌ Failed to revoke session", "error");
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    if (!window.confirm("This will log you out from all other devices. Continue?")) return;
+    try {
+      await logoutAllDevices();
+      showToast("✅ Logged out from all other devices", "success");
+      fetchSessions();
+    } catch (err) {
+      showToast("❌ Failed to logout all devices", "error");
     }
   };
 
@@ -465,6 +502,80 @@ export default function UserProfilePage({ user, setPage, showToast }) {
               </div>
             </>
           )}
+        </div>
+
+        {/* Sessions / Active Devices Card */}
+        <div
+          style={{
+            background: COLORS.navyMid,
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 16,
+            padding: 28,
+            marginTop: 24
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <div>
+              <h2 style={{ color: COLORS.white, margin: 0 }}>📱 Active Devices</h2>
+              <p style={{ color: COLORS.gray, fontSize: 13, margin: "4px 0 0" }}>Devices currently logged into your account</p>
+            </div>
+            {sessions.length > 1 && (
+              <Btn onClick={handleLogoutAll} variant="secondary" style={{ fontSize: 11, padding: "6px 10px", color: COLORS.red, borderColor: "rgba(239, 68, 68, 0.3)" }}>
+                Logout All Others
+              </Btn>
+            )}
+          </div>
+
+          <div style={{ display: "grid", gap: 12 }}>
+            {loadingSessions ? (
+              <div style={{ color: COLORS.gray, textAlign: "center", padding: 20 }}>Loading sessions...</div>
+            ) : sessions.length === 0 ? (
+              <div style={{ color: COLORS.gray, textAlign: "center", padding: 20 }}>No active sessions found</div>
+            ) : (
+              sessions.map((s) => (
+                <div key={s.jti} style={{
+                  padding: 16,
+                  background: COLORS.navy,
+                  borderRadius: 12,
+                  border: `1px solid ${s.is_current ? "rgba(37, 99, 235, 0.3)" : "rgba(255,255,255,0.05)"}`,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <div style={{ fontSize: 24 }}>{s.device.toLowerCase().includes("mobile") ? "📱" : "💻"}</div>
+                    <div>
+                      <div style={{ color: COLORS.white, fontSize: 14, fontWeight: 600 }}>
+                        {s.device.split(')')[0].split('(')[1] || s.device.split('/')[0]}
+                        {s.is_current && <span style={{ marginLeft: 8, color: COLORS.blue, fontSize: 10, background: "rgba(37, 99, 235, 0.1)", padding: "2px 6px", borderRadius: 4 }}>CURRENT</span>}
+                      </div>
+                      <div style={{ color: COLORS.gray, fontSize: 12, marginTop: 2 }}>
+                        {s.ip} • {new Date(s.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  {!s.is_current && (
+                    <button 
+                      onClick={() => handleRevokeSession(s.jti)}
+                      style={{ 
+                        background: "none", 
+                        border: "none", 
+                        color: COLORS.gray, 
+                        cursor: "pointer", 
+                        fontSize: 18,
+                        padding: 8,
+                        transition: "color 0.2s"
+                      }}
+                      onMouseOver={(e) => e.target.style.color = COLORS.red}
+                      onMouseOut={(e) => e.target.style.color = COLORS.gray}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, Boolean
 from .database import Base
 from datetime import datetime
 import enum
@@ -46,3 +46,14 @@ class Vote(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     candidate_id = Column(Integer, ForeignKey("candidates.id"))
     election_id = Column(Integer, ForeignKey("elections.id"), nullable=True)
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    token_jti = Column(String, unique=True, index=True)
+    device_info = Column(String) # Browser/OS info
+    ip_address = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)

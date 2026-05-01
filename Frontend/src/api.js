@@ -58,3 +58,12 @@ export const verifyProfileUpdateOTP = (email, otp) => API.post("/profile/verify-
 export const resendProfileUpdateOTP = (email) => API.post("/profile/resend-update-otp", { email });
 export const updateUserProfile = (name, email) => API.put("/profile", { name, email });
 export const changePassword = (data) => API.post("/change-password", data);
+
+// Session Management
+export const listSessions = () => API.get("/sessions");
+export const logoutAllDevices = () => API.post("/sessions/logout-all");
+export const revokeSession = (jti) => API.delete(`/sessions/${jti}`);
+
+// PDF Receipt
+export const downloadVoteReceipt = (electionId) => 
+  API.get(`/votes/${electionId}/receipt`, { responseType: 'blob' });

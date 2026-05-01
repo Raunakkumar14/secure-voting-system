@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import COLORS from "../constants/colors";
 import Btn from "../components/ui/Btn";
 import Modal from "../components/ui/Modal";
-import { getCandidates, castVote } from "../api";
+import { getCandidates, castVote, downloadVoteReceipt } from "../api";
 
 export default function VoterDashboard({ user, setPage, showToast }) {
   const [candidates, setCandidates] = useState([]);
   const [selected, setSelected] = useState(null);
   const [confirmModal, setConfirmModal] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     getCandidates()
@@ -33,6 +34,28 @@ export default function VoterDashboard({ user, setPage, showToast }) {
     } catch (err) {
       showToast("❌ You have already voted or voting failed", "error");
       setHasVoted(true);
+    }
+  };
+
+  const handleDownloadReceipt = async () => {
+    setIsDownloading(true);
+    try {
+      // Find the election ID from the first candidate
+      const electionId = candidates[0]?.election_id || 1;
+      const response = await downloadVoteReceipt(electionId);
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `vote_receipt_election_${electionId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showToast("📥 Receipt downloaded successfully", "success");
+    } catch (err) {
+      showToast("❌ Failed to download receipt. Did you vote first?", "error");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -67,15 +90,21 @@ export default function VoterDashboard({ user, setPage, showToast }) {
             border: "1px solid rgba(16, 185, 129, 0.2)",
             display: "flex",
             alignItems: "center",
+            justifyContent: "space-between",
             gap: 16
           }}>
-            <div style={{ fontSize: 32 }}>✅</div>
-            <div>
-              <h3 style={{ color: COLORS.green, margin: 0, fontSize: 18, fontWeight: 700 }}>Voting Complete</h3>
-              <p style={{ color: "rgba(16, 185, 129, 0.8)", margin: "4px 0 0", fontSize: 14 }}>
-                Your vote has been cryptographically sealed and recorded on the ledger.
-              </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ fontSize: 32 }}>✅</div>
+              <div>
+                <h3 style={{ color: COLORS.green, margin: 0, fontSize: 18, fontWeight: 700 }}>Voting Complete</h3>
+                <p style={{ color: "rgba(16, 185, 129, 0.8)", margin: "4px 0 0", fontSize: 14 }}>
+                  Your vote has been cryptographically sealed and recorded.
+                </p>
+              </div>
             </div>
+            <Btn onClick={handleDownloadReceipt} disabled={isDownloading} variant="success" style={{ padding: "10px 20px", fontSize: 14 }}>
+              {isDownloading ? "Generating..." : "📥 Download Receipt"}
+            </Btn>
           </div>
         )}
 
