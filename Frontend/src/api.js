@@ -18,6 +18,7 @@ export const loginUser = (data) => API.post("/login", data);
 
 // Voting
 export const getCandidates = () => API.get("/candidates");
+export const getActiveElections = () => API.get("/active-elections");
 export const castVote = (candidateId) => API.post("/vote", { candidate_id: candidateId });
 
 // Results + stats
@@ -50,6 +51,8 @@ export const listElections = () => API.get("/admin/elections");
 export const startElection = (electionId) => API.post(`/admin/elections/${electionId}/start`);
 export const endElection = (electionId) => API.post(`/admin/elections/${electionId}/end`);
 export const getElectionResults = (electionId) => API.get(`/admin/elections/${electionId}/results`);
+export const getElectionTally = (electionId) => API.get(`/elections/${electionId}/results`);
+export const getElectionLedger = (electionId) => API.get(`/elections/${electionId}/ledger`);
 
 // User Profile Management
 export const getUserProfile = () => API.get("/profile");
@@ -67,3 +70,6 @@ export const revokeSession = (jti) => API.delete(`/sessions/${jti}`);
 // PDF Receipt
 export const downloadVoteReceipt = (electionId) => 
   API.get(`/votes/${electionId}/receipt`, { responseType: 'blob' });
+
+// Admin - Audit Logs
+export const getAuditLogs = () => API.get("/admin/audit-logs");

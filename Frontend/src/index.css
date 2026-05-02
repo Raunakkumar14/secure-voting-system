@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap');
 
 :root {
+  /* Default Dark Theme Variables */
   --navy: #0a0e1a;
   --navy-mid: #0d1529;
   --navy-light: #142040;
@@ -11,11 +12,30 @@
   --gray: #8ea3c3;
   --glass: rgba(255, 255, 255, 0.03);
   --glass-border: rgba(255, 255, 255, 0.08);
+  --text-main: #f0f6ff;
+  --text-muted: #8ea3c3;
+  --bg-gradient: linear-gradient(135deg, #0a0e1a 0%, #0d1529 100%);
+}
+
+[data-theme='light'] {
+  --navy: #f8fafc;
+  --navy-mid: #ffffff;
+  --navy-light: #f1f5f9;
+  --blue: #2563eb;
+  --blue-light: #3b82f6;
+  --cyan: #0891b2;
+  --white: #0f172a;
+  --gray: #475569;
+  --glass: rgba(0, 0, 0, 0.02);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 * {
   box-sizing: border-box;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.4s ease, color 0.4s ease;
 }
 
 body {
@@ -24,8 +44,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--navy);
-  color: var(--white);
+  background-image: var(--bg-gradient);
+  color: var(--text-main);
   overflow-x: hidden;
+  min-height: 100vh;
 }
 
 /* Custom Scrollbar */
@@ -70,4 +92,10 @@ body {
 
 .float {
   animation: float 4s ease-in-out infinite;
+}
+
+/* Transitions for framer-motion */
+.page-container {
+  width: 100%;
+  min-height: 100vh;
 }

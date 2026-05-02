@@ -46,6 +46,7 @@ class Vote(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     candidate_id = Column(Integer, ForeignKey("candidates.id"))
     election_id = Column(Integer, ForeignKey("elections.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class UserSession(Base):
     __tablename__ = "user_sessions"
@@ -57,3 +58,16 @@ class UserSession(Base):
     ip_address = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey("users.id"))
+    admin_name = Column(String)
+    action = Column(String) # e.g., "CREATE_CANDIDATE", "START_ELECTION"
+    target_type = Column(String) # e.g., "candidate", "election"
+    target_id = Column(Integer, nullable=True)
+    details = Column(String) # Detailed description
+    ip_address = Column(String, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)

@@ -38,7 +38,8 @@ def get_candidates(db):
 def create_candidate(db, candidate):
     new_candidate = models.Candidate(
         name=candidate.name,
-        description=candidate.description
+        description=candidate.description,
+        election_id=candidate.election_id
     )
     db.add(new_candidate)
     db.commit()
@@ -55,6 +56,8 @@ def update_candidate(db, candidate_id, candidate):
         db_candidate.name = candidate.name
     if candidate.description:
         db_candidate.description = candidate.description
+    if candidate.election_id is not None:
+        db_candidate.election_id = candidate.election_id
     
     db.commit()
     db.refresh(db_candidate)
@@ -69,20 +72,22 @@ def delete_candidate(db, candidate_id):
     db.delete(db_candidate)
     db.commit()
     return True
-
-
 def create_vote(db, user_id, candidate_id):
-    # 🚫 Check if user already voted
+    # Get candidate to find election_id
+    candidate = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
+    if not candidate:
+        return None
+    
+    election_id = candidate.election_id
+
+    # 🚫 Check if user already voted IN THIS SPECIFIC ELECTION
     existing_vote = db.query(models.Vote).filter(
-        models.Vote.user_id == user_id
+        models.Vote.user_id == user_id,
+        models.Vote.election_id == election_id
     ).first()
 
     if existing_vote:
-        return None  # already voted
-
-    # Get candidate to find election_id
-    candidate = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
-    election_id = candidate.election_id if candidate else None
+        return None  # already voted in this election
 
     new_vote = models.Vote(
         user_id=user_id,
@@ -215,8 +220,6 @@ def start_election(db, election_id):
     db.commit()
     db.refresh(election)
     return election
-
-
 def end_election(db, election_id):
     election = db.query(models.Election).filter(models.Election.id == election_id).first()
     if not election:
@@ -230,6 +233,67 @@ def end_election(db, election_id):
     db.commit()
     db.refresh(election)
     return election
+
+def get_active_elections_with_candidates(db):
+    """Fetch all active elections and their associated candidates"""
+    active_elections = db.query(models.Election).filter(models.Election.status == "active").all()
+    result = []
+    for election in active_elections:
+        candidates = db.query(models.Candidate).filter(models.Candidate.election_id == election.id).all()
+        result.append({
+            "id": election.id,
+            "title": election.title,
+            "description": election.description,
+            "candidates": [
+                {"id": c.id, "name": c.name, "description": c.description} for c in candidates
+            ]
+        })
+    return result
+
+def get_election_results_tally(db, election_id):
+    """Get live tally for a specific election"""
+    election = db.query(models.Election).filter(models.Election.id == election_id).first()
+    if not election:
+        return None
+    
+    candidates = db.query(models.Candidate).filter(models.Candidate.election_id == election_id).all()
+    results = []
+    tally = {}
+    
+    for c in candidates:
+        count = db.query(models.Vote).filter(models.Vote.candidate_id == c.id).count()
+        results.append({
+            "id": c.id,
+            "name": c.name,
+            "votes": count
+        })
+        tally[c.name] = count
+        
+    return {
+        "id": election.id,
+        "title": election.title,
+        "status": election.status,
+        "total_votes": sum(tally.values()),
+        "candidates": results,
+        "tally": tally
+    }
+
+def get_election_votes_ledger(db, election_id):
+    """Get anonymized vote ledger for a specific election"""
+    import hashlib
+    votes = db.query(models.Vote).filter(models.Vote.election_id == election_id).all()
+    result = []
+    for i, v in enumerate(votes):
+        candidate = db.query(models.Candidate).filter(models.Candidate.id == v.candidate_id).first()
+        # Generate a stable mock hash to hide user identity
+        voter_hash = hashlib.sha256(f"USER_{v.user_id}_ELECTION_{election_id}".encode()).hexdigest()[:16]
+        result.append({
+            "index": i + 1,
+            "hash": f"0x{voter_hash}...",
+            "candidate": candidate.name if candidate else "Unknown",
+            "timestamp": v.created_at.strftime("%Y-%m-%d %H:%M:%S") if v.created_at else "Now"
+        })
+    return result
 
 # Session Management
 def create_session(db, user_id, jti, device_info, ip_address):
@@ -274,3 +338,24 @@ def revoke_all_user_sessions(db, user_id, except_jti=None):
     
     query.update({"is_active": False}, synchronize_session=False)
     db.commit()
+
+# Audit Logs
+def create_audit_log(db, admin_id, admin_name, action, target_type, target_id=None, details=None, ip_address=None):
+    """Record an administrative action"""
+    log = models.AuditLog(
+        admin_id=admin_id,
+        admin_name=admin_name,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        details=details,
+        ip_address=ip_address
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return log
+
+def get_audit_logs(db, limit=100):
+    """Retrieve the most recent audit logs"""
+    return db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).limit(limit).all()

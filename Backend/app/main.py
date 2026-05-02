@@ -69,13 +69,20 @@ def get_current_user(request: Request, authorization: str = Header(None), db: Se
     
     return user
 
-def get_admin_user(authorization: str = Header(None), db: Session = Depends(get_db)):
+def get_admin_user(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Dependency to get current authenticated admin user."""
-    user = get_current_user(authorization)
-    db_user = db.query(models.User).filter(models.User.id == user["id"]).first()
+    db_user = db.query(models.User).filter(models.User.id == current_user["id"]).first()
     if not db_user or db_user.role != "admin":
         raise HTTPException(403, "Admin access required")
-    return user
+    
+    # Return enriched user info including name for audit logs
+    return {
+        "id": db_user.id,
+        "email": db_user.email,
+        "name": db_user.name,
+        "role": db_user.role,
+        "jti": current_user["jti"]
+    }
 
 # OTP
 @app.post("/check-email")
@@ -288,6 +295,21 @@ def login(request: Request, user: schemas.UserLogin, db: Session = Depends(get_d
 def candidates(db: Session = Depends(get_db)):
     return crud.get_candidates(db)
 
+@app.get("/active-elections")
+def get_active_elections(db: Session = Depends(get_db)):
+    """Get all active elections with their candidates for voters"""
+    return crud.get_active_elections_with_candidates(db)
+
+@app.get("/elections/{election_id}/results")
+def get_election_results_api(election_id: int, db: Session = Depends(get_db)):
+    """Get live results for a specific election"""
+    return crud.get_election_results_tally(db, election_id)
+
+@app.get("/elections/{election_id}/ledger")
+def get_election_ledger_api(election_id: int, db: Session = Depends(get_db)):
+    """Get anonymized ledger for a specific election"""
+    return crud.get_election_votes_ledger(db, election_id)
+
 @app.post("/vote")
 async def vote(vote: schemas.VoteCreate, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     result = crud.create_vote(db, current_user["id"], vote.candidate_id)
@@ -314,30 +336,79 @@ def stats(db: Session = Depends(get_db)):
 
 # ADMIN - Candidate Management
 @app.post("/admin/candidates")
-def create_candidate_admin(candidate: schemas.CandidateCreate, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+def create_candidate_admin(request: Request, candidate: schemas.CandidateCreate, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
     """Admin only - Create a new candidate"""
-    return crud.create_candidate(db, candidate)
+    result = crud.create_candidate(db, candidate)
+    
+    crud.create_audit_log(
+        db, 
+        user["id"], 
+        user.get("name", "Admin"), 
+        "CREATE_CANDIDATE", 
+        "candidate", 
+        result.id, 
+        f"Created candidate: {result.name}",
+        request.client.host
+    )
+    return result
 
 @app.put("/admin/candidates/{candidate_id}", response_model=schemas.CandidateResponse)
-def update_candidate_admin(candidate_id: int, candidate: schemas.CandidateUpdate, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+def update_candidate_admin(request: Request, candidate_id: int, candidate: schemas.CandidateUpdate, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
     """Admin only - Update a candidate"""
     result = crud.update_candidate(db, candidate_id, candidate)
     if not result:
         raise HTTPException(404, "Candidate not found")
+    
+    crud.create_audit_log(
+        db, 
+        user["id"], 
+        user.get("name", "Admin"), 
+        "UPDATE_CANDIDATE", 
+        "candidate", 
+        candidate_id, 
+        f"Updated candidate: {result.name}",
+        request.client.host
+    )
     return result
 
 @app.delete("/admin/candidates/{candidate_id}")
-def delete_candidate_admin(candidate_id: int, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+def delete_candidate_admin(request: Request, candidate_id: int, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
     """Admin only - Delete a candidate"""
+    # Get name before deletion for the log
+    candidate = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
+    candidate_name = candidate.name if candidate else "Unknown"
+
     if not crud.delete_candidate(db, candidate_id):
         raise HTTPException(404, "Candidate not found")
+    
+    crud.create_audit_log(
+        db, 
+        user["id"], 
+        user.get("name", "Admin"), 
+        "DELETE_CANDIDATE", 
+        "candidate", 
+        candidate_id, 
+        f"Deleted candidate: {candidate_name}",
+        request.client.host
+    )
     return {"msg": "Candidate deleted"}
 
 # ADMIN - Election Management
 @app.post("/admin/elections")
-def create_election_admin(election: schemas.ElectionCreate, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+def create_election_admin(request: Request, election: schemas.ElectionCreate, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
     """Admin only - Create a new election"""
     result = crud.create_election(db, election)
+    
+    crud.create_audit_log(
+        db, 
+        user["id"], 
+        user.get("name", "Admin"), 
+        "CREATE_ELECTION", 
+        "election", 
+        result.id, 
+        f"Created election: {result.title}",
+        request.client.host
+    )
     return {"id": result.id, "title": result.title, "description": result.description, "status": result.status,
             "created_at": result.created_at.isoformat() if result.created_at else None,
             "started_at": result.started_at.isoformat() if result.started_at else None,
@@ -353,16 +424,30 @@ def list_elections_admin(user: dict = Depends(get_admin_user), db: Session = Dep
              "ended_at": e.ended_at.isoformat() if e.ended_at else None} for e in elections]
 
 @app.post("/admin/elections/{election_id}/start")
-async def start_election_admin(election_id: int, background_tasks: BackgroundTasks, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+async def start_election_admin(request: Request, election_id: int, background_tasks: BackgroundTasks, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
     """Admin only - Start an election"""
     election = crud.start_election(db, election_id)
     if not election:
-        raise HTTPException(400, "Election not found or cannot be started")
+        print(f"DEBUG: Failed to start election {election_id}. Check if it exists and is 'upcoming'.")
+        raise HTTPException(400, "Election not found or cannot be started. It must be in 'upcoming' status.")
+    
+    print(f"DEBUG: Successfully started election: {election.title}")
     
     # Send email notifications to all voters
     emails = crud.get_all_voter_emails(db)
     if emails:
         background_tasks.add_task(send_election_alert, emails, election.title)
+    
+    crud.create_audit_log(
+        db, 
+        user["id"], 
+        user.get("name", "Admin"), 
+        "START_ELECTION", 
+        "election", 
+        election_id, 
+        f"Started election: {election.title}",
+        request.client.host
+    )
         
     return {"id": election.id, "title": election.title, "description": election.description, "status": election.status,
             "created_at": election.created_at.isoformat() if election.created_at else None,
@@ -370,11 +455,22 @@ async def start_election_admin(election_id: int, background_tasks: BackgroundTas
             "ended_at": election.ended_at.isoformat() if election.ended_at else None}
 
 @app.post("/admin/elections/{election_id}/end")
-def end_election_admin(election_id: int, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+def end_election_admin(request: Request, election_id: int, user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
     """Admin only - End an election"""
     election = crud.end_election(db, election_id)
     if not election:
         raise HTTPException(400, "Election not found or cannot be ended")
+    
+    crud.create_audit_log(
+        db, 
+        user["id"], 
+        user.get("name", "Admin"), 
+        "END_ELECTION", 
+        "election", 
+        election_id, 
+        f"Ended election: {election.title}",
+        request.client.host
+    )
     return {"id": election.id, "title": election.title, "description": election.description, "status": election.status,
             "created_at": election.created_at.isoformat() if election.created_at else None,
             "started_at": election.started_at.isoformat() if election.started_at else None,
@@ -413,6 +509,11 @@ def get_election_results(election_id: int, user: dict = Depends(get_admin_user),
         "total_votes": total_votes,
         "candidates": results
     }
+
+@app.get("/admin/audit-logs")
+def get_audit_logs(user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Admin only - Get recent audit logs"""
+    return crud.get_audit_logs(db)
 
 # USER PROFILE MANAGEMENT
 @app.get("/profile", response_model=schemas.UserProfileResponse)

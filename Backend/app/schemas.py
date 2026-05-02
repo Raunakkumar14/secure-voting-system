@@ -33,15 +33,18 @@ class PasswordResetRequest(BaseModel):
 class CandidateCreate(BaseModel):
     name: str
     description: str = None
+    election_id: int = None
 
 class CandidateUpdate(BaseModel):
     name: str = None
     description: str = None
+    election_id: int = None
 
 class CandidateResponse(BaseModel):
     id: int
     name: str
     description: str = None
+    election_id: int = None
 
 # Election Management
 class ElectionCreate(BaseModel):

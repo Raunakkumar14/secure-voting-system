@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import COLORS from "../constants/colors";
 import Btn from "../components/ui/Btn";
 import BarChart from "../components/ui/BarChart";
-import { getResults, getStats } from "../api";
+import { getResults, getStats, getAuditLogs } from "../api";
 
 export default function AdminDashboard({ setPage, showToast }) {
   const [results, setResults] = useState({});
@@ -11,6 +11,7 @@ export default function AdminDashboard({ setPage, showToast }) {
     total_votes: 0,
     total_candidates: 0,
   });
+  const [logs, setLogs] = useState([]);
 
   useEffect(() => {
     getResults()
@@ -20,6 +21,10 @@ export default function AdminDashboard({ setPage, showToast }) {
     getStats()
       .then((res) => setStats(res.data))
       .catch(() => showToast("Failed to load stats", "error"));
+
+    getAuditLogs()
+      .then((res) => setLogs(res.data))
+      .catch(() => console.error("Failed to load audit logs"));
   }, []);
 
   return (
@@ -155,11 +160,83 @@ export default function AdminDashboard({ setPage, showToast }) {
           </div>
         </div>
 
-        {/* Global Actions */}
         <div style={{ marginTop: 32, display: "flex", gap: 16 }}>
           <Btn onClick={() => setPage("ledger")} variant="secondary" style={{ flex: 1 }}>
-            View Full Audit Ledger
+            View Public Voting Ledger
           </Btn>
+        </div>
+
+        {/* Audit Logs Section */}
+        <div style={{
+          marginTop: 48,
+          background: "rgba(255, 255, 255, 0.01)",
+          padding: "32px",
+          borderRadius: 28,
+          border: "1px solid rgba(255,255,255,0.06)",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+            <div>
+              <h3 style={{ color: COLORS.white, fontFamily: "'Outfit', sans-serif", fontSize: 22, margin: 0 }}>
+                System Activity Logs 📜
+              </h3>
+              <p style={{ color: COLORS.gray, fontSize: 14, marginTop: 4 }}>
+                Tracked administrative actions and security events.
+              </p>
+            </div>
+            <div style={{ color: COLORS.gray, fontSize: 13, fontWeight: 600 }}>
+              Showing last {logs.length} events
+            </div>
+          </div>
+
+          <div style={{ 
+            maxHeight: 400, 
+            overflowY: "auto", 
+            paddingRight: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12
+          }} className="custom-scrollbar">
+            {logs.length === 0 ? (
+              <div style={{ color: COLORS.gray, textAlign: "center", padding: "40px 0" }}>
+                No activity logs recorded yet.
+              </div>
+            ) : logs.map((log, i) => (
+              <div key={i} style={{
+                background: "rgba(255,255,255,0.03)",
+                padding: "16px 20px",
+                borderRadius: 16,
+                border: "1px solid rgba(255,255,255,0.05)",
+                display: "grid",
+                gridTemplateColumns: "100px 1fr 180px",
+                alignItems: "center",
+                gap: 20
+              }}>
+                <div style={{ 
+                  fontSize: 11, 
+                  fontWeight: 700, 
+                  color: log.action.includes("DELETE") ? COLORS.red : log.action.includes("CREATE") ? COLORS.green : COLORS.blue,
+                  background: "rgba(255,255,255,0.04)",
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  textAlign: "center",
+                  textTransform: "uppercase"
+                }}>
+                  {log.action.replace("_", " ")}
+                </div>
+                <div>
+                  <div style={{ color: COLORS.white, fontSize: 14, fontWeight: 500 }}>
+                    {log.details}
+                  </div>
+                  <div style={{ color: COLORS.gray, fontSize: 12, marginTop: 2 }}>
+                    By <span style={{ color: COLORS.blue }}>{log.admin_name}</span> • IP: {log.ip_address}
+                  </div>
+                </div>
+                <div style={{ color: COLORS.gray, fontSize: 12, textAlign: "right", fontFamily: "monospace" }}>
+                  {new Date(log.timestamp).toLocaleString()}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
       </div>

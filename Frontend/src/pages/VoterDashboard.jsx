@@ -2,46 +2,53 @@ import { useState, useEffect } from "react";
 import COLORS from "../constants/colors";
 import Btn from "../components/ui/Btn";
 import Modal from "../components/ui/Modal";
-import { getCandidates, castVote, downloadVoteReceipt } from "../api";
+import { getActiveElections, castVote, downloadVoteReceipt } from "../api";
+import confetti from "canvas-confetti";
 
 export default function VoterDashboard({ user, setPage, showToast }) {
-  const [candidates, setCandidates] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [elections, setElections] = useState([]);
+  const [activeViewElection, setActiveViewElection] = useState(null); // The election being viewed/voted in
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [confirmModal, setConfirmModal] = useState(false);
-  const [hasVoted, setHasVoted] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [votedElections, setVotedElections] = useState([]); // Array of IDs
+  const [isDownloading, setIsDownloading] = useState(null); // ID of election being downloaded
 
   useEffect(() => {
-    getCandidates()
-      .then((res) => setCandidates(res.data))
-      .catch(() => showToast("Failed to load candidates", "error"));
+    getActiveElections()
+      .then((res) => setElections(res.data))
+      .catch(() => showToast("Failed to load elections", "error"));
   }, []);
 
-  const handleVote = () => {
-    if (!selected) {
-      showToast("Please select a candidate", "error");
-      return;
-    }
+  const handleVoteClick = (candidateId) => {
+    setSelectedCandidate(candidateId);
     setConfirmModal(true);
   };
 
   const confirmVote = async () => {
     try {
-      await castVote(selected);
+      await castVote(selectedCandidate);
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: [COLORS.blue, COLORS.cyan, COLORS.green]
+      });
       showToast("✅ Vote recorded successfully!", "success");
-      setHasVoted(true);
+      setVotedElections([...votedElections, activeViewElection.id]);
       setConfirmModal(false);
     } catch (err) {
-      showToast("❌ You have already voted or voting failed", "error");
-      setHasVoted(true);
+      const errorMsg = err.response?.data?.detail || "Voting failed";
+      showToast(`❌ ${errorMsg}`, "error");
+      if (errorMsg.includes("already voted")) {
+        setVotedElections([...votedElections, activeViewElection.id]);
+      }
+      setConfirmModal(false);
     }
   };
 
-  const handleDownloadReceipt = async () => {
-    setIsDownloading(true);
+  const handleDownloadReceipt = async (electionId) => {
+    setIsDownloading(electionId);
     try {
-      // Find the election ID from the first candidate
-      const electionId = candidates[0]?.election_id || 1;
       const response = await downloadVoteReceipt(electionId);
       
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -53,9 +60,9 @@ export default function VoterDashboard({ user, setPage, showToast }) {
       link.remove();
       showToast("📥 Receipt downloaded successfully", "success");
     } catch (err) {
-      showToast("❌ Failed to download receipt. Did you vote first?", "error");
+      showToast("❌ Failed to download receipt.", "error");
     } finally {
-      setIsDownloading(false);
+      setIsDownloading(null);
     }
   };
 
@@ -64,117 +71,220 @@ export default function VoterDashboard({ user, setPage, showToast }) {
       <div style={{ maxWidth: 850, margin: "0 auto" }}>
         
         {/* Header Section */}
-        <div style={{ marginBottom: 40 }}>
-          <h1 style={{ 
-            color: COLORS.white, 
-            fontFamily: "'Outfit', sans-serif", 
-            fontSize: "clamp(32px, 5vw, 42px)", 
-            fontWeight: 800,
-            margin: 0,
-            letterSpacing: "-0.02em"
-          }}>
-            Welcome back, {user.name.split(' ')[0]} 🗳️
-          </h1>
-          <p style={{ color: COLORS.gray, fontSize: 16, marginTop: 8 }}>
-            Select your preferred candidate to cast your secure vote.
-          </p>
-        </div>
-
-        {/* Voting Status */}
-        {hasVoted && (
-          <div style={{
-            marginBottom: 32,
-            padding: "24px",
-            borderRadius: 20,
-            background: "rgba(16, 185, 129, 0.05)",
-            border: "1px solid rgba(16, 185, 129, 0.2)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={{ fontSize: 32 }}>✅</div>
-              <div>
-                <h3 style={{ color: COLORS.green, margin: 0, fontSize: 18, fontWeight: 700 }}>Voting Complete</h3>
-                <p style={{ color: "rgba(16, 185, 129, 0.8)", margin: "4px 0 0", fontSize: 14 }}>
-                  Your vote has been cryptographically sealed and recorded.
-                </p>
-              </div>
-            </div>
-            <Btn onClick={handleDownloadReceipt} disabled={isDownloading} variant="success" style={{ padding: "10px 20px", fontSize: 14 }}>
-              {isDownloading ? "Generating..." : "📥 Download Receipt"}
-            </Btn>
-          </div>
-        )}
-
-        {/* Candidate Selection */}
-        {!hasVoted && (
-          <div style={{
-            background: "rgba(255, 255, 255, 0.02)",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            borderRadius: 28,
-            padding: "32px",
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.3)"
-          }}>
-            <h2 style={{ 
+        {!activeViewElection ? (
+          <div style={{ marginBottom: 40 }}>
+            <h1 style={{ 
               color: COLORS.white, 
-              fontSize: 20, 
-              fontWeight: 700, 
-              fontFamily: "'Outfit', sans-serif",
-              marginBottom: 24,
-              display: "flex",
-              alignItems: "center",
-              gap: 10
+              fontFamily: "'Outfit', sans-serif", 
+              fontSize: "clamp(32px, 5vw, 42px)", 
+              fontWeight: 800,
+              margin: 0,
+              letterSpacing: "-0.02em"
             }}>
-              <span>🏆</span> Active Candidates
-            </h2>
-
-            <div style={{ display: "grid", gap: 12 }}>
-              {candidates.map((c) => (
-                <label key={c.id} style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 16,
-                  padding: "20px 24px",
-                  background: selected === c.id ? "rgba(26, 86, 219, 0.1)" : "rgba(255, 255, 255, 0.03)",
-                  border: `1px solid ${selected === c.id ? COLORS.blue : "rgba(255, 255, 255, 0.1)"}`,
-                  borderRadius: 16,
+              Active Ballots 🗳️
+            </h1>
+            <p style={{ color: COLORS.gray, fontSize: 16, marginTop: 8 }}>
+              Select an ongoing election below to view candidates and cast your vote.
+            </p>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 40, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+            <div>
+              <button 
+                onClick={() => {
+                  setActiveViewElection(null);
+                  setSelectedCandidate(null);
+                }}
+                style={{ 
+                  background: "rgba(255,255,255,0.05)", 
+                  border: "1px solid rgba(255,255,255,0.1)", 
+                  color: COLORS.gray, 
+                  padding: "8px 16px", 
+                  borderRadius: 10, 
                   cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  transform: selected === c.id ? "scale(1.01)" : "scale(1)"
-                }}>
-                  <input
-                    type="radio"
-                    name="candidate"
-                    value={c.id}
-                    checked={selected === c.id}
-                    onChange={() => setSelected(c.id)}
-                    style={{ width: 20, height: 20, cursor: "pointer", accentColor: COLORS.blue }}
-                  />
-                  <div>
-                    <div style={{ color: COLORS.white, fontSize: 18, fontWeight: 700, fontFamily: "'Outfit', sans-serif" }}>{c.name}</div>
-                    {c.description && <div style={{ color: COLORS.gray, fontSize: 13, marginTop: 4 }}>{c.description}</div>}
-                  </div>
-                </label>
-              ))}
+                  fontSize: 13,
+                  marginBottom: 16,
+                  transition: "all 0.2s"
+                }}
+                onMouseOver={(e) => e.target.style.background = "rgba(255,255,255,0.1)"}
+                onMouseOut={(e) => e.target.style.background = "rgba(255,255,255,0.05)"}
+              >
+                ← Back to Elections
+              </button>
+              <h1 style={{ 
+                color: COLORS.white, 
+                fontFamily: "'Outfit', sans-serif", 
+                fontSize: 32, 
+                fontWeight: 800,
+                margin: 0
+              }}>
+                {activeViewElection.title}
+              </h1>
+              <p style={{ color: COLORS.gray, fontSize: 15, marginTop: 6 }}>
+                {activeViewElection.description}
+              </p>
             </div>
-
-            <Btn onClick={handleVote} style={{ width: "100%", marginTop: 32, padding: "16px" }} disabled={!selected}>
-              Review & Cast Vote
-            </Btn>
+            {votedElections.includes(activeViewElection.id) && (
+              <div style={{ 
+                background: "rgba(16, 185, 129, 0.1)", 
+                color: COLORS.green, 
+                padding: "8px 16px", 
+                borderRadius: 20, 
+                fontSize: 12, 
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: 1
+              }}>
+                Voted ✅
+              </div>
+            )}
           </div>
         )}
+
+        <div style={{ display: "grid", gap: 24 }}>
+          {!activeViewElection ? (
+            /* ELECTION LIST VIEW */
+            elections.length === 0 ? (
+              <div style={{ 
+                textAlign: "center", 
+                padding: "60px", 
+                background: "rgba(255,255,255,0.02)", 
+                borderRadius: 28,
+                border: "1px solid rgba(255,255,255,0.08)"
+              }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
+                <h3 style={{ color: COLORS.white, margin: 0 }}>No Active Elections</h3>
+                <p style={{ color: COLORS.gray, marginTop: 8 }}>Please check back later for upcoming ballots.</p>
+              </div>
+            ) : elections.map((election) => {
+              const hasVotedThis = votedElections.includes(election.id);
+              return (
+                <div 
+                  key={election.id} 
+                  onClick={() => setActiveViewElection(election)}
+                  style={{
+                    background: "rgba(255, 255, 255, 0.02)",
+                    border: `1px solid ${hasVotedThis ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.08)"}`,
+                    borderRadius: 24,
+                    padding: "24px 32px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    transition: "all 0.3s ease",
+                    boxShadow: "0 10px 30px -15px rgba(0,0,0,0.5)"
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.borderColor = hasVotedThis ? "rgba(16, 185, 129, 0.4)" : "rgba(255, 255, 255, 0.15)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.02)";
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.borderColor = hasVotedThis ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.08)";
+                  }}
+                >
+                  <div>
+                    <h3 style={{ color: COLORS.white, margin: 0, fontSize: 20, fontFamily: "'Outfit', sans-serif" }}>
+                      {election.title}
+                    </h3>
+                    <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 13, color: COLORS.gray }}>
+                      <span>👤 {election.candidates.length} Candidates</span>
+                      <span>•</span>
+                      <span style={{ color: hasVotedThis ? COLORS.green : COLORS.blue, fontWeight: 600 }}>
+                        {hasVotedThis ? "Voted ✅" : "Voting Open 🔓"}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ color: COLORS.gray, fontSize: 20 }}>→</div>
+                </div>
+              );
+            })
+          ) : (
+            /* CANDIDATE SELECTION VIEW */
+            <div>
+              {votedElections.includes(activeViewElection.id) ? (
+                <div style={{
+                  padding: "40px",
+                  borderRadius: 28,
+                  background: "rgba(16, 185, 129, 0.03)",
+                  border: "1px dashed rgba(16, 185, 129, 0.3)",
+                  textAlign: "center"
+                }}>
+                  <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+                  <h2 style={{ color: COLORS.white, margin: 0 }}>Vote Confirmed</h2>
+                  <p style={{ color: COLORS.gray, marginTop: 8, marginBottom: 32 }}>
+                    Your vote for this election has been cryptographically sealed.
+                  </p>
+                  <Btn 
+                    onClick={() => handleDownloadReceipt(activeViewElection.id)} 
+                    variant="success" 
+                    disabled={isDownloading === activeViewElection.id}
+                    style={{ padding: "14px 40px" }}
+                  >
+                    {isDownloading === activeViewElection.id ? "Generating Receipt..." : "📥 Download Official Receipt"}
+                  </Btn>
+                </div>
+              ) : (
+                <div style={{
+                  background: "rgba(255, 255, 255, 0.02)",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: 28,
+                  padding: "32px",
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.3)"
+                }}>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {activeViewElection.candidates.map((c) => (
+                      <label key={c.id} style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        padding: "20px 24px",
+                        background: selectedCandidate === c.id ? "rgba(26, 86, 219, 0.15)" : "rgba(255, 255, 255, 0.03)",
+                        border: `1px solid ${selectedCandidate === c.id ? COLORS.blue : "rgba(255, 255, 255, 0.08)"}`,
+                        borderRadius: 20,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease"
+                      }}>
+                        <input
+                          type="radio"
+                          name={`election-${activeViewElection.id}`}
+                          checked={selectedCandidate === c.id}
+                          onChange={() => setSelectedCandidate(c.id)}
+                          style={{ width: 20, height: 20, accentColor: COLORS.blue }}
+                        />
+                        <div>
+                          <div style={{ color: COLORS.white, fontSize: 18, fontWeight: 700, fontFamily: "'Outfit', sans-serif" }}>{c.name}</div>
+                          {c.description && <div style={{ color: COLORS.gray, fontSize: 13, marginTop: 4 }}>{c.description}</div>}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <Btn 
+                    onClick={() => handleVoteClick(selectedCandidate)} 
+                    style={{ width: "100%", marginTop: 32, padding: "18px" }} 
+                    disabled={!selectedCandidate}
+                  >
+                    Review & Cast Vote
+                  </Btn>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Footer Actions */}
-        <div style={{ marginTop: 32, display: "flex", gap: 16 }}>
-          <Btn onClick={() => setPage("ledger")} variant="secondary" style={{ flex: 1 }}>
-            📜 Public Ledger
-          </Btn>
-          <Btn onClick={() => setPage("profile")} variant="secondary" style={{ flex: 1 }}>
-            👤 My Profile
-          </Btn>
-        </div>
+        {!activeViewElection && (
+          <div style={{ marginTop: 48, display: "flex", gap: 16 }}>
+            <Btn onClick={() => setPage("ledger")} variant="secondary" style={{ flex: 1 }}>
+              📜 Public Ledger
+            </Btn>
+            <Btn onClick={() => setPage("profile")} variant="secondary" style={{ flex: 1 }}>
+              👤 My Profile
+            </Btn>
+          </div>
+        )}
       </div>
 
       {/* Confirm Modal */}
@@ -185,8 +295,9 @@ export default function VoterDashboard({ user, setPage, showToast }) {
             <p style={{ color: COLORS.white, fontSize: 16, lineHeight: 1.6 }}>
               You are about to cast your vote for:<br />
               <strong style={{ fontSize: 24, color: COLORS.cyan, display: "block", marginTop: 8 }}>
-                {candidates.find(c => c.id === selected)?.name}
+                {activeViewElection?.candidates.find(c => c.id === selectedCandidate)?.name}
               </strong>
+              in the <span style={{ color: COLORS.blue }}>{activeViewElection?.title}</span>
             </p>
             <p style={{ color: COLORS.gray, fontSize: 13, marginTop: 16, background: "rgba(255,255,255,0.05)", padding: 12, borderRadius: 10 }}>
               ⚠️ This action is permanent and cannot be reversed once encrypted.

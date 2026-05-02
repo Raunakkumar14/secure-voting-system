@@ -6,18 +6,30 @@ import {
   createCandidate,
   updateCandidate,
   deleteCandidate,
+  listElections,
 } from "../api";
 
 export default function CandidateManagement({ setPage, showToast }) {
   const [candidates, setCandidates] = useState([]);
+  const [elections, setElections] = useState([]);
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({ name: "", description: "" });
+  const [formData, setFormData] = useState({ name: "", description: "", election_id: "" });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchCandidates();
+    fetchElections();
   }, []);
+
+  const fetchElections = async () => {
+    try {
+      const res = await listElections();
+      setElections(res.data);
+    } catch (err) {
+      console.error("Failed to load elections", err);
+    }
+  };
 
   const fetchCandidates = async () => {
     try {
@@ -41,10 +53,13 @@ export default function CandidateManagement({ setPage, showToast }) {
         await updateCandidate(editingId, formData);
         showToast("Candidate updated successfully", "success");
       } else {
-        await createCandidate(formData);
+        await createCandidate({
+          ...formData,
+          election_id: formData.election_id || null
+        });
         showToast("Candidate created successfully", "success");
       }
-      setFormData({ name: "", description: "" });
+      setFormData({ name: "", description: "", election_id: "" });
       setEditingId(null);
       setIsCreating(false);
       await fetchCandidates();
@@ -56,7 +71,11 @@ export default function CandidateManagement({ setPage, showToast }) {
   };
 
   const handleEdit = (candidate) => {
-    setFormData({ name: candidate.name, description: candidate.description || "" });
+    setFormData({ 
+      name: candidate.name, 
+      description: candidate.description || "", 
+      election_id: candidate.election_id || "" 
+    });
     setEditingId(candidate.id);
     setIsCreating(true);
   };
@@ -158,6 +177,31 @@ export default function CandidateManagement({ setPage, showToast }) {
                   placeholder="Enter candidate description"
                 />
               </div>
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ color: COLORS.gray, fontSize: 12, display: "block", marginBottom: 6 }}>
+                  Assign to Election
+                </label>
+                <select
+                  value={formData.election_id}
+                  onChange={(e) => setFormData({ ...formData, election_id: e.target.value })}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    background: COLORS.navy,
+                    border: `1px solid rgba(255,255,255,0.2)`,
+                    borderRadius: 8,
+                    color: COLORS.white,
+                    fontSize: 14,
+                    boxSizing: "border-box",
+                    cursor: "pointer"
+                  }}
+                >
+                  <option value="">-- No Election Assigned --</option>
+                  {elections.map(e => (
+                    <option key={e.id} value={e.id}>{e.title} ({e.status})</option>
+                  ))}
+                </select>
+              </div>
               <div style={{ display: "flex", gap: 12 }}>
                 <Btn type="submit" disabled={loading}>
                   {loading ? "Saving..." : editingId ? "Update Candidate" : "Create Candidate"}
@@ -209,6 +253,21 @@ export default function CandidateManagement({ setPage, showToast }) {
                 }}>
                   {candidate.description}
                 </p>
+              )}
+              {candidate.election_id && (
+                <div style={{ 
+                  marginBottom: 16, 
+                  fontSize: 11, 
+                  background: "rgba(59,130,246,0.1)", 
+                  color: COLORS.blue, 
+                  padding: "4px 8px", 
+                  borderRadius: 4,
+                  display: "inline-block",
+                  fontWeight: 700,
+                  textTransform: "uppercase"
+                }}>
+                  Election: {elections.find(e => e.id === candidate.election_id)?.title || "Unknown"}
+                </div>
               )}
               <div style={{ display: "flex", gap: 8 }}>
                 <button

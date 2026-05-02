@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createElection, listElections, startElection, endElection, getElectionResults } from "../api";
 import Btn from "../components/ui/Btn";
+import Input from "../components/ui/Input";
 import COLORS from "../constants/colors";
 
 export const ElectionManagement = ({ onBack }) => {

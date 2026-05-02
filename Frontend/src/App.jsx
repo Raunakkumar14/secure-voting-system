@@ -15,6 +15,9 @@ import { ElectionManagement } from "./pages/ElectionManagement";
 import LedgerPage from "./pages/LedgerPage";
 import UserProfilePage from "./pages/UserProfilePage";
 import { useToast } from "./hooks/useToast";
+import { ThemeProvider } from "./context/ThemeContext";
+import { motion, AnimatePresence } from "framer-motion";
+import ThemeToggle from "./components/ui/ThemeToggle";
 import COLORS from "./constants/colors";
 
 export default function App() {
@@ -63,12 +66,29 @@ export default function App() {
   }
 
   return (
-    <div style={{ background: COLORS.navy, minHeight: "100vh" }}>
+    <ThemeProvider>
+      <AppContent 
+        page={page} setPage={setPage} 
+        user={user} onLogin={onLogin} onLogout={onLogout} 
+        isAuthenticated={isAuthenticated} 
+        toast={toast} showToast={showToast} clearToast={clearToast}
+      />
+    </ThemeProvider>
+  );
+}
+
+function AppContent({ page, setPage, user, onLogin, onLogout, isAuthenticated, toast, showToast, clearToast }) {
+  const pageVariants = {
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -10 },
+  };
+
+  return (
+    <div style={{ background: "var(--navy)", minHeight: "100vh", position: "relative" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700;800;900&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
         * { box-sizing: border-box; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        @keyframes slideIn { from{transform:translateX(40px);opacity:0} to{transform:translateX(0);opacity:1} }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
         ::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.4); border-radius: 3px; }
@@ -77,17 +97,33 @@ export default function App() {
 
       <Navbar setPage={setPage} user={user} onLogout={onLogout} />
 
-      {page === "landing"      && <LandingPage setPage={setPage} />}
-      {page === "register"     && <RegisterPage setPage={setPage} showToast={showToast} onLogin={onLogin} />}
-      {page === "login"        && <LoginPage setPage={setPage} onLogin={onLogin} showToast={showToast} />}
-      {page === "adminLogin"   && <AdminLoginPage setPage={setPage} onLogin={onLogin} showToast={showToast} />}
-      {page === "forgotPassword" && <ForgotPasswordPage setPage={setPage} showToast={showToast} />}
-      {isAuthenticated && page === "profile"       && <UserProfilePage user={user} setPage={setPage} showToast={showToast} />}
-      {isAuthenticated && user?.role === "voter" && page === "voterDash"    && <VoterDashboard user={user} setPage={setPage} showToast={showToast} />}
-      {isAuthenticated && user?.role === "admin" && page === "admin"        && <AdminDashboard setPage={setPage} showToast={showToast} />}
-      {isAuthenticated && user?.role === "admin" && page === "candidates"   && <CandidateManagement setPage={setPage} showToast={showToast} />}
-      {isAuthenticated && user?.role === "admin" && page === "elections"    && <ElectionManagement onBack={() => setPage("admin")} />}
-      {isAuthenticated && page === "ledger"       && <LedgerPage user={user} />}
+      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1000 }}>
+        <ThemeToggle />
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={page}
+          variants={pageVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="page-container"
+        >
+          {page === "landing"      && <LandingPage setPage={setPage} />}
+          {page === "register"     && <RegisterPage setPage={setPage} showToast={showToast} onLogin={onLogin} />}
+          {page === "login"        && <LoginPage setPage={setPage} onLogin={onLogin} showToast={showToast} />}
+          {page === "adminLogin"   && <AdminLoginPage setPage={setPage} onLogin={onLogin} showToast={showToast} />}
+          {page === "forgotPassword" && <ForgotPasswordPage setPage={setPage} showToast={showToast} />}
+          {isAuthenticated && page === "profile"       && <UserProfilePage user={user} setPage={setPage} showToast={showToast} />}
+          {isAuthenticated && user?.role === "voter" && page === "voterDash"    && <VoterDashboard user={user} setPage={setPage} showToast={showToast} />}
+          {isAuthenticated && user?.role === "admin" && page === "admin"        && <AdminDashboard setPage={setPage} showToast={showToast} />}
+          {isAuthenticated && user?.role === "admin" && page === "candidates"   && <CandidateManagement setPage={setPage} showToast={showToast} />}
+          {isAuthenticated && user?.role === "admin" && page === "elections"    && <ElectionManagement onBack={() => setPage("admin")} />}
+          {isAuthenticated && page === "ledger"       && <LedgerPage user={user} />}
+        </motion.div>
+      </AnimatePresence>
 
       {toast && (
         <Toast message={toast.message} type={toast.type} onClose={clearToast} />
