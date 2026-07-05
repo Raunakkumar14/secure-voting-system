@@ -148,13 +148,13 @@ The tables will be created automatically on first run.
 4. Test thoroughly
 5. Submit pull request
 
-## 📄 License
-
-MIT License
-
 ## 🤝 Team Members
 
 - Add team member names here
+- Bumika Thakur
+- Rubi Kumari
+- Sandip Yadav
+- Raunak Kumar
 
 ---
 
